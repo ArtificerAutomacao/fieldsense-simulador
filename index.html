@@ -276,6 +276,7 @@ table.at td.params { font-size: 12px; color: var(--muted); }
           <option value="1">Médio</option>
           <option value="2">Lento</option>
           <option value="3">Carregamento</option>
+          <option value="4">Trato</option>
           <option value="9">Personalizado</option>
         </select>
       </label>
@@ -402,6 +403,7 @@ const PRESETS = [
   { name: 'Médio', core: 1, fc: 6, med: 1, accI: 1, slI: 80, v0I: 40, aI: 200, vmI: 400, accM: 1, slM: 80, v0M: 30, aM: 150, vmM: 300, ma: 1.0 },
   { name: 'Lento', core: 1, fc: 3, med: 1, accI: 1, slI: 40, v0I: 20, aI: 100, vmI: 200, accM: 1, slM: 40, v0M: 20, aM: 80, vmM: 150, ma: 2.0 },
   { name: 'Carregamento', core: 1, fc: 2, med: 1, accI: 1, slI: 160, v0I: 0, aI: 200, vmI: 400, accM: 1, slM: 80, v0M: 11, aM: 150, vmM: 300, ma: 3.0 },
+  { name: 'Trato', core: 1, fc: 2, med: 1, accI: 1, slI: 160, v0I: 0, aI: 200, vmI: 400, accM: 1, slM: 80, v0M: 11, aM: 150, vmM: 300, ma: 0.8 },
 ];
 const DISPLAY_DEFAULT = { dec: 0, div: 1, sw: 5, st: 10 };
 
@@ -986,7 +988,7 @@ function loadScenario(i) {
 
 function setPreset(i) {
   S.preset = i;
-  if (i < 4) S.p = { ...PRESETS[i], ...DISPLAY_DEFAULT, dec: S.p.dec ?? 0, div: S.p.div ?? 1, sw: S.p.sw ?? 5, st: S.p.st ?? 10 };
+  if (i < PRESETS.length) S.p = { ...PRESETS[i], ...DISPLAY_DEFAULT, dec: S.p.dec ?? 0, div: S.p.div ?? 1, sw: S.p.sw ?? 5, st: S.p.st ?? 10 };
   syncInputs();
 }
 
@@ -1046,7 +1048,7 @@ function bind() {
     S.events.push({ type: 'pa', t0: last ? Math.round(last.t0 + last.dur + 20) : 20, kg: 500, dur: 1.5 });
     renderEvents(); schedule();
   });
-  $('preset').addEventListener('change', e => { const v = +e.target.value; if (v < 4) setPreset(v); else S.preset = 9; schedule(); });
+  $('preset').addEventListener('change', e => { const v = +e.target.value; if (v < PRESETS.length) setPreset(v); else S.preset = 9; schedule(); });
   const custom = () => { S.preset = 9; $('preset').value = 9; };
   Object.entries(P_FIELDS).forEach(([id, k]) => $(id).addEventListener('change', e => {
     S.p[k] = +e.target.value;
