@@ -284,6 +284,13 @@ table.at td.params { font-size: 12px; color: var(--muted); }
           <option value="9">Personalizado</option>
         </select>
       </label>
+      <label class="row">Leitura do conversor
+        <select id="acq">
+          <option value="ultima">Última leitura (balança atual)</option>
+          <option value="media">Média das leituras</option>
+          <option value="rdy">Média de todas as conversões (sincronizada)</option>
+        </select>
+      </label>
       <details id="tuner">
         <summary>Parâmetros do preset</summary>
         <div class="row2">
@@ -462,7 +469,7 @@ const EV_TYPES = { pa: 'Pá', rampa: 'Rampa', descarga: 'Descarga' };
 const S = {
   scen: 0, w0: 0, dur: 0, events: [], d: {},
   preset: 3, p: {}, sens: 0.5, adOn: true,
-  flowOn: true, flow: 0, gateSig: true,
+  flowOn: true, flow: 0, gateSig: true, acq: 'ultima',
   phaseOn: false, /* fase da operação: desativada na página por enquanto */
   csv: null,
   view: null,          /* [i0, i1] visível */
@@ -606,17 +613,22 @@ function generate(seedOverride) {
     if (d.swayA > 0 && d.swayT > 0 && t >= d.moveT0 && t <= d.moveT1) /* balanço do vagão no terreno */
       x += Math.min(1, (t - d.moveT0) / 2, (d.moveT1 - t) / 2) * d.swayA * (0.7 * Math.sin(2 * Math.PI * t / d.swayT + phS1) + 0.3 * Math.sin(2 * Math.PI * t / (d.swayT * 1.618) + phS2));
     for (const [tb, a, f] of bumps) { const tau = t - tb; if (tau >= 0 && tau < 2.5) x += a * Math.exp(-tau / 0.45) * Math.sin(2 * Math.PI * f * tau); }
-    if (d.noise > 0) x += (d.noise / 2) * gauss();
     for (const [ti, a] of imp) { const u = (t - ti) / 0.15; if (u >= 0 && u <= 1) x += a * Math.sin(Math.PI * u); }
     x += d.drift / 60 * t;
     input[i] = w + x;
   }
-  /* vibração de motor/TDP: gerada a 500 Hz, filtrada como no conversor
-   * (sinc4 a 50 conversões/s) e lida a 20 Hz pela última conversão — sem
-   * filtro anti-aliasing, como no equipamento. Frequências perto de 20 Hz
-   * reaparecem como oscilações lentas. */
+  /* Aquisição, como na balança: o conversor faz 50 conversões/s (filtro
+   * sinc4); a tarefa de leitura pega a última conversão a cada ~20,1 ms; a
+   * cadeia de filtro roda a 20 Hz e recebe, conforme o modo:
+   *   'ultima' — a última leitura (firmware atual: descarta ~60 %);
+   *   'media'  — a média das leituras desde o passo anterior;
+   *   'rdy'    — a média das conversões novas, cada uma uma vez só.
+   * O ruído é por conversão. A vibração de motor/TDP é gerada a 500 Hz e
+   * passa pelo sinc4: perto de 20 Hz ela reaparece como oscilação lenta. */
+  const ODR = 50, TR = 0.0201, nConv = Math.ceil(n * DT * ODR) + 3;
+  const conv = new Float64Array(nConv);
   if (d.engA > 0 && d.engF > 0) {
-    const FS = 500, R = FS / 50, nP = Math.ceil(n * DT * FS) + 4 * R + 1;
+    const FS = 500, R = FS / ODR, nP = nConv * R + 4 * R + 1;
     const p1 = rnd() * 6.283, p2 = rnd() * 6.283, p3 = rnd() * 6.283, wob = (d.engW || 0) / 100;
     let y = new Float64Array(nP), ph = rnd() * 6.283;
     for (let k = 0; k < nP; k++) {
@@ -631,10 +643,28 @@ function generate(seedOverride) {
       for (let k = 0; k < nP; k++) { acc += y[k]; if (k >= R) acc -= y[k - R]; z[k] = acc / R; }
       y = z;
     }
-    for (let i = 0; i < n; i++) {
-      const conv = Math.floor(i * DT * 50 + 1e-9); /* última conversão pronta */
-      input[i] += y[Math.min(nP - 1, conv * R + 4 * R)];
+    for (let j = 0; j < nConv; j++) conv[j] = y[j * R + 4 * R];
+  }
+  if (d.noise > 0) for (let j = 0; j < nConv; j++) conv[j] += (d.noise / 2) * gauss();
+  const convAt = t => conv[Math.min(nConv - 1, Math.max(0, Math.floor(t * ODR + 1e-9)))];
+  const acq = S.acq || 'ultima';
+  for (let i = 0; i < n; i++) {
+    const t = i * DT, tp = t - DT;
+    let v;
+    if (acq === 'rdy') {
+      const j0 = Math.floor(tp * ODR + 1e-9) + 1, j1 = Math.floor(t * ODR + 1e-9);
+      let sum = 0, c = 0;
+      for (let j = Math.max(0, j0); j <= j1; j++) { sum += conv[Math.min(nConv - 1, j)]; c++; }
+      v = c ? sum / c : convAt(t);
+    } else if (acq === 'media') {
+      const k0 = Math.floor(tp / TR) + 1, k1 = Math.floor(t / TR);
+      let sum = 0, c = 0;
+      for (let k = Math.max(0, k0); k <= k1; k++) { sum += convAt(k * TR); c++; }
+      v = c ? sum / c : convAt(Math.floor(t / TR) * TR);
+    } else {
+      v = convAt(Math.floor(t / TR) * TR); /* última leitura */
     }
+    input[i] += v;
   }
 
   /* sinal da comporta: aberta durante cada descarga */
@@ -1011,6 +1041,7 @@ function syncInputs() {
   $('sens').value = S.sens; $('sensOut').textContent = Math.round(S.sens * 100) + '%';
   $('adOn').checked = S.adOn;
   $('flowOn').checked = S.flowOn; $('flow').value = S.flow; $('gateSig').checked = S.gateSig;
+  $('acq').value = S.acq;
   $('flow').disabled = $('gateSig').disabled = !S.flowOn;
   renderEvents();
 }
@@ -1064,6 +1095,7 @@ function bind() {
   $('flowOn').addEventListener('change', e => { S.flowOn = e.target.checked; syncInputs(); schedule(); });
   $('flow').addEventListener('change', e => { S.flow = Math.max(0, +e.target.value); schedule(); });
   $('gateSig').addEventListener('change', e => { S.gateSig = e.target.checked; schedule(); });
+  $('acq').addEventListener('change', e => { S.acq = e.target.value; schedule(); });
 
   $('csv').addEventListener('change', async e => {
     const f = e.target.files[0];
