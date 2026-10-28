@@ -262,6 +262,11 @@ table.at td.params { font-size: 12px; color: var(--muted); }
         <label>Solavanco (kg)<input type="number" id="bumpA" step="10" min="0"></label>
         <label>Vazão irregular (%)<input type="number" id="flowIrr" step="10" min="0" max="90"></label>
       </div>
+      <div class="row3">
+        <label>Inclinações/min<input type="number" id="tiltR" step="0.5" min="0"></label>
+        <label>Desvio na inclinação (kg)<input type="number" id="tiltA" step="10" min="0"></label>
+        <label>Duração (s)<input type="number" id="tiltD" step="1" min="3"></label>
+      </div>
       <div class="row2">
         <label>Andando de (s)<input type="number" id="moveT0" step="5" min="0"></label>
         <label>até (s)<input type="number" id="moveT1" step="5" min="0"></label>
@@ -286,8 +291,8 @@ table.at td.params { font-size: 12px; color: var(--muted); }
       </label>
       <label class="row">Leitura do conversor
         <select id="acq">
-          <option value="ultima">Última leitura (balança atual)</option>
-          <option value="media">Média das leituras</option>
+          <option value="media">Média das leituras (balança 1.2.3)</option>
+          <option value="ultima">Última leitura (até 1.2.2)</option>
           <option value="rdy">Média de todas as conversões (sincronizada)</option>
         </select>
       </label>
@@ -418,7 +423,7 @@ const DISPLAY_DEFAULT = { dec: 0, div: 1, sw: 5, st: 10 };
 /* ------------------------------------------------------------- cenários */
 const VIB = (a, f, h = 30, t0 = 0, t1 = 1e9) => ({ vibOn: true, vibA: a, vibF: f, vibH: h, vibT0: t0, vibT1: t1 });
 /* perturbações do vagão em movimento: desligadas salvo indicação */
-const D_DEFAULT = { swayA: 0, swayT: 3.5, bumpR: 0, bumpA: 200, flowIrr: 0, engA: 0, engF: 22, engW: 8, moveT0: 0, moveT1: 1e9 };
+const D_DEFAULT = { swayA: 0, swayT: 3.5, bumpR: 0, bumpA: 200, flowIrr: 0, engA: 0, engF: 22, engW: 8, moveT0: 0, moveT1: 1e9, tiltR: 0, tiltA: 80, tiltD: 10 };
 /* vibração de motor/TDP (alta frequência): passa pelo filtro do conversor e
  * pela leitura a 20 Hz, como na balança */
 const HF = (a, f, w = 8) => ({ engA: a, engF: f, engW: w });
@@ -428,7 +433,7 @@ const SCENARIOS = [
     ev: [['pa', 20, 900, 2], ['pa', 45, 1100, 2], ['rampa', 75, 1500, 25], ['pa', 125, 150, 1], ['pa', 150, 60, 1], ['rampa', 175, 600, 12],
          ['descarga', 225, -1300, 22], ['descarga', 262, -1200, 20], ['descarga', 300, -1300, 22]],
     d: { ...VIB(60, 1.1), ...HF(150, 21), noise: 15, impR: 3, impA: 200, drift: 0, seed: 11,
-         swayA: 80, swayT: 3.5, bumpR: 5, bumpA: 300, flowIrr: 40, moveT0: 210, moveT1: 345 },
+         swayA: 80, swayT: 3.5, bumpR: 5, bumpA: 300, flowIrr: 40, moveT0: 210, moveT1: 345, tiltR: 1.5, tiltA: 80, tiltD: 10 },
   },
   {
     name: 'Pá carregadeira', w0: 2000, dur: 100,
@@ -453,7 +458,7 @@ const SCENARIOS = [
   {
     name: 'Trato: distribuição com o vagão andando', w0: 6500, dur: 200,
     ev: [['descarga', 15, -1800, 30], ['descarga', 70, -2200, 35], ['descarga', 130, -1500, 25]], flow: 55,
-    d: { ...VIB(60, 1.1), ...HF(150, 24, 12), noise: 15, impR: 3, impA: 200, drift: 0, seed: 13, swayA: 100, swayT: 3.5, bumpR: 6, bumpA: 350, flowIrr: 50 },
+    d: { ...VIB(60, 1.1), ...HF(150, 24, 12), noise: 15, impR: 3, impA: 200, drift: 0, seed: 13, swayA: 100, swayT: 3.5, bumpR: 6, bumpA: 350, flowIrr: 50, tiltR: 1.5, tiltA: 80, tiltD: 10 },
   },
   {
     name: 'Degrau limpo (laboratório)', w0: 0, dur: 60,
@@ -469,7 +474,7 @@ const EV_TYPES = { pa: 'Pá', rampa: 'Rampa', descarga: 'Descarga' };
 const S = {
   scen: 0, w0: 0, dur: 0, events: [], d: {},
   preset: 3, p: {}, sens: 0.5, adOn: true,
-  flowOn: true, flow: 0, gateSig: true, acq: 'ultima',
+  flowOn: true, flow: 0, gateSig: true, acq: 'media',
   phaseOn: false, /* fase da operação: desativada na página por enquanto */
   csv: null,
   view: null,          /* [i0, i1] visível */
@@ -578,6 +583,24 @@ function generate(seedOverride) {
   }
   const phS1 = rnd() * 6.283, phS2 = rnd() * 6.283;
 
+  /* inclinação do vagão num trecho do caminho: o peso lido se desloca
+   * (50–100 % de tiltA, para mais ou para menos) por ~tiltD s, com entrada e
+   * saída suaves de 1,5 s */
+  const tilts = [];
+  if (d.tiltR > 0 && d.tiltA > 0) {
+    const p = d.tiltR / 60 * DT;
+    let busyUntil = -1;
+    for (let i = 0; i < n; i++) {
+      const t = i * DT;
+      if (t < d.moveT0 || t > d.moveT1 || t < busyUntil) continue;
+      if (rnd() < p) {
+        const dur = Math.max(3, d.tiltD * (0.6 + 0.8 * rnd()));
+        tilts.push([t, dur, d.tiltA * (0.6 + 0.4 * rnd()) * (rnd() < 0.7 ? 1 : -1)]);
+        busyUntil = t + dur + 3;
+      }
+    }
+  }
+
   const evs = S.events.map(e => ({ ...e, kg: e.type === 'descarga' ? -Math.abs(e.kg) : e.kg, dur: Math.max(e.dur, DT) }));
   /* vazão irregular em rampa/descarga: fração acumulada com taxa variável */
   const irr = Math.min(0.9, Math.max(0, (d.flowIrr || 0) / 100));
@@ -612,6 +635,13 @@ function generate(seedOverride) {
     }
     if (d.swayA > 0 && d.swayT > 0 && t >= d.moveT0 && t <= d.moveT1) /* balanço do vagão no terreno */
       x += Math.min(1, (t - d.moveT0) / 2, (d.moveT1 - t) / 2) * d.swayA * (0.7 * Math.sin(2 * Math.PI * t / d.swayT + phS1) + 0.3 * Math.sin(2 * Math.PI * t / (d.swayT * 1.618) + phS2));
+    for (const [t0, dur, a] of tilts) {
+      const u = t - t0;
+      if (u > 0 && u < dur) {
+        const rise = Math.min(1, u / 1.5, (dur - u) / 1.5);
+        x += a * rise * rise * (3 - 2 * rise); /* transição suave */
+      }
+    }
     for (const [tb, a, f] of bumps) { const tau = t - tb; if (tau >= 0 && tau < 2.5) x += a * Math.exp(-tau / 0.45) * Math.sin(2 * Math.PI * f * tau); }
     for (const [ti, a] of imp) { const u = (t - ti) / 0.15; if (u >= 0 && u <= 1) x += a * Math.sin(Math.PI * u); }
     x += d.drift / 60 * t;
@@ -620,12 +650,12 @@ function generate(seedOverride) {
   /* Aquisição, como na balança: o conversor faz 50 conversões/s (filtro
    * sinc4); a tarefa de leitura pega a última conversão a cada ~20,1 ms; a
    * cadeia de filtro roda a 20 Hz e recebe, conforme o modo:
-   *   'ultima' — a última leitura (firmware atual: descarta ~60 %);
-   *   'media'  — a média das leituras desde o passo anterior;
+   *   'ultima' — a última leitura (firmware até 1.2.2: descarta ~60 %);
+   *   'media'  — a média das leituras desde o passo anterior (1.2.3);
    *   'rdy'    — a média das conversões novas, cada uma uma vez só.
    * O ruído é por conversão. A vibração de motor/TDP é gerada a 500 Hz e
    * passa pelo sinc4: perto de 20 Hz ela reaparece como oscilação lenta. */
-  const ODR = 50, TR = 0.0201, nConv = Math.ceil(n * DT * ODR) + 3;
+  const ODR = 50, TR = S.acqTR || 0.0201, nConv = Math.ceil(n * DT * ODR) + 3;
   const conv = new Float64Array(nConv);
   if (d.engA > 0 && d.engF > 0) {
     const FS = 500, R = FS / ODR, nP = nConv * R + 4 * R + 1;
@@ -647,7 +677,7 @@ function generate(seedOverride) {
   }
   if (d.noise > 0) for (let j = 0; j < nConv; j++) conv[j] += (d.noise / 2) * gauss();
   const convAt = t => conv[Math.min(nConv - 1, Math.max(0, Math.floor(t * ODR + 1e-9)))];
-  const acq = S.acq || 'ultima';
+  const acq = S.acq || 'media';
   for (let i = 0; i < n; i++) {
     const t = i * DT, tp = t - DT;
     let v;
@@ -1028,7 +1058,7 @@ function setPreset(i) {
 
 const P_FIELDS = { p_core: 'core', p_fc: 'fc', p_ma: 'ma', p_sl_iir: 'slI', p_v0_iir: 'v0I', p_a_iir: 'aI', p_vm_iir: 'vmI', p_sl_ma: 'slM', p_v0_ma: 'v0M', p_a_ma: 'aM', p_vm_ma: 'vmM', p_dec: 'dec', p_div: 'div', p_sw: 'sw', p_st: 'st' };
 const P_CHECKS = { p_med: 'med', p_acc_iir: 'accI', p_acc_ma: 'accM' };
-const D_FIELDS = ['vibA', 'vibF', 'vibH', 'vibT0', 'vibT1', 'noise', 'impR', 'impA', 'drift', 'seed', 'swayA', 'swayT', 'bumpR', 'bumpA', 'flowIrr', 'engA', 'engF', 'engW', 'moveT0', 'moveT1'];
+const D_FIELDS = ['vibA', 'vibF', 'vibH', 'vibT0', 'vibT1', 'noise', 'impR', 'impA', 'drift', 'seed', 'swayA', 'swayT', 'bumpR', 'bumpA', 'flowIrr', 'engA', 'engF', 'engW', 'moveT0', 'moveT1', 'tiltR', 'tiltA', 'tiltD'];
 
 function syncInputs() {
   $('scenario').value = S.scen;
