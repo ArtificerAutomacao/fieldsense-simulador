@@ -340,9 +340,6 @@ table.at td.params { font-size: 12px; color: var(--muted); }
         <input type="range" id="sens" min="0" max="1" step="0.05">
       </label>
       <p class="note">Mais sensível: entra no modo rápido com cargas menores. Menos sensível: mais imune a vibração forte.</p>
-      <h3>Fase da operação</h3>
-      <label class="chk"><input type="checkbox" id="phaseOn"> A balança sabe a fase (carregamento ou trato)</label>
-      <p class="note">No carregamento o peso só sobe; no trato, só desce. Com a fase conhecida, variações no sentido contrário são tratadas como perturbação e, entre uma carga e outra, a leitura fica travada no nível (média longa).</p>
       <h3>Descarga (modelo do vagão)</h3>
       <label class="chk"><input type="checkbox" id="flowOn"> Usar a vazão do vagão na descarga</label>
       <div class="row2">
@@ -459,7 +456,8 @@ const EV_TYPES = { pa: 'Pá', rampa: 'Rampa', descarga: 'Descarga' };
 const S = {
   scen: 0, w0: 0, dur: 0, events: [], d: {},
   preset: 3, p: {}, sens: 0.5, adOn: true,
-  flowOn: true, flow: 0, gateSig: true, phaseOn: true,
+  flowOn: true, flow: 0, gateSig: true,
+  phaseOn: false, /* fase da operação: desativada na página por enquanto */
   csv: null,
   view: null,          /* [i0, i1] visível */
   hide: new Set(),
@@ -1007,7 +1005,6 @@ function syncInputs() {
   $('sens').value = S.sens; $('sensOut').textContent = Math.round(S.sens * 100) + '%';
   $('adOn').checked = S.adOn;
   $('flowOn').checked = S.flowOn; $('flow').value = S.flow; $('gateSig').checked = S.gateSig;
-  $('phaseOn').checked = S.phaseOn;
   $('flow').disabled = $('gateSig').disabled = !S.flowOn;
   renderEvents();
 }
@@ -1061,7 +1058,6 @@ function bind() {
   $('flowOn').addEventListener('change', e => { S.flowOn = e.target.checked; syncInputs(); schedule(); });
   $('flow').addEventListener('change', e => { S.flow = Math.max(0, +e.target.value); schedule(); });
   $('gateSig').addEventListener('change', e => { S.gateSig = e.target.checked; schedule(); });
-  $('phaseOn').addEventListener('change', e => { S.phaseOn = e.target.checked; schedule(); });
 
   $('csv').addEventListener('change', async e => {
     const f = e.target.files[0];
