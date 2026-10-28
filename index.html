@@ -1,0 +1,1093 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Simulador de Filtragem</title>
+<style>
+:root {
+  --bg: #f4f6f8;
+  --card: #ffffff;
+  --ink: #17212b;
+  --muted: #5d6b78;
+  --line: #dfe5ea;
+  --grid: #e9eef2;
+  --accent: #0f6e5c;
+  --truth: #8a96a3;
+  --input: #c9d2da;
+  --cur: #2b6cb0;
+  --ada: #e07a1f;
+  --fast: rgba(224, 122, 31, 0.13);
+  --ok: #2f9e5b;
+  --bad: #c2453b;
+  --field: #f7f9fb;
+  --shadow: 0 1px 2px rgba(16, 24, 32, .06), 0 4px 14px rgba(16, 24, 32, .05);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #11161b; --card: #182028; --ink: #e6ecf1; --muted: #9aa8b5;
+    --line: #2a3540; --grid: #222c35; --accent: #3fbf9f; --truth: #9aa6b2;
+    --input: #3a4652; --cur: #6aa7ff; --ada: #ff9d47; --fast: rgba(255, 157, 71, 0.14);
+    --ok: #4cc27c; --bad: #ff7b6e; --field: #121a21;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #11161b; --card: #182028; --ink: #e6ecf1; --muted: #9aa8b5;
+  --line: #2a3540; --grid: #222c35; --accent: #3fbf9f; --truth: #9aa6b2;
+  --input: #3a4652; --cur: #6aa7ff; --ada: #ff9d47; --fast: rgba(255, 157, 71, 0.14);
+  --ok: #4cc27c; --bad: #ff7b6e; --field: #121a21;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .4);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; }
+body {
+  background: var(--bg); color: var(--ink);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+h1 { font-size: 19px; margin: 0; letter-spacing: -.01em; }
+h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 10px; }
+h3 { font-size: 12px; color: var(--muted); margin: 12px 0 4px; font-weight: 600; }
+.sub { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+
+.top {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  padding: 14px 20px; background: var(--card); border-bottom: 1px solid var(--line);
+}
+.brand { display: flex; gap: 12px; align-items: center; }
+.logo { width: 34px; height: 34px; border-radius: 9px; background: linear-gradient(135deg, var(--accent), var(--cur)); flex: none; }
+.tour { display: flex; gap: 6px; flex-wrap: wrap; }
+.tour button {
+  border: 1px solid var(--line); background: var(--field); color: var(--ink);
+  padding: 7px 12px; border-radius: 999px; font: inherit; font-size: 13px; cursor: pointer;
+}
+.tour button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.tour button.free.on { background: var(--ink); border-color: var(--ink); color: var(--card); }
+
+.layout { display: grid; grid-template-columns: 360px minmax(0, 1fr); gap: 16px; padding: 16px 20px; align-items: start; }
+.panel { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.brand > div { min-width: 0; }
+.stage { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.box, .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px; box-shadow: var(--shadow); }
+.eng { border-style: dashed; }
+
+label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--muted); }
+label.row { margin-bottom: 8px; }
+label.chk { flex-direction: row; align-items: center; gap: 7px; color: var(--ink); font-size: 13px; margin: 4px 0 6px; }
+label.chk.inl { align-self: end; margin-bottom: 8px; }
+.row2, .row3, .row4 { display: grid; gap: 8px; margin-bottom: 8px; }
+.row2 { grid-template-columns: 1fr 1fr; }
+.row3 { grid-template-columns: repeat(3, 1fr); }
+.row4 { grid-template-columns: repeat(4, 1fr); }
+input[type=number], select {
+  width: 100%; min-width: 0; padding: 6px 8px; border: 1px solid var(--line); border-radius: 7px;
+  background: var(--field); color: var(--ink); font: inherit; font-size: 13px;
+}
+input[type=range] { width: 100%; accent-color: var(--ada); }
+output { color: var(--ink); font-weight: 600; }
+details summary { cursor: pointer; color: var(--accent); font-size: 13px; margin: 2px 0 6px; }
+.note { color: var(--muted); font-size: 12px; margin: 6px 0 0; }
+
+.btn {
+  border: 1px solid var(--accent); background: var(--accent); color: #fff; border-radius: 8px;
+  padding: 7px 12px; font: inherit; font-size: 13px; cursor: pointer; display: inline-block;
+}
+.btn.small { padding: 5px 10px; font-size: 12px; }
+.btn.ghost { background: transparent; color: var(--accent); }
+.filebox { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+
+table.ev { width: 100%; border-collapse: collapse; margin-bottom: 8px; table-layout: fixed; }
+table.ev th { font-size: 11px; color: var(--muted); font-weight: 500; text-align: left; padding: 0 3px 4px; }
+table.ev td { padding: 2px 3px; }
+table.ev th:nth-child(1) { width: 19%; }
+table.ev th:nth-child(2) { width: 33%; }
+table.ev th:nth-child(3) { width: 24%; }
+table.ev th:nth-child(4) { width: 18%; }
+table.ev input, table.ev select { padding: 4px 5px; font-size: 12px; width: 100%; min-width: 0; }
+table.ev .del { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 15px; padding: 2px 4px; }
+
+.chart-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.legend .it { display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer; user-select: none; }
+.legend .it.off { opacity: .4; }
+.legend .sw { width: 18px; height: 3px; border-radius: 2px; }
+.legend .sw.band { height: 10px; border-radius: 3px; }
+.chart-tools { display: flex; gap: 10px; align-items: center; }
+.hint { color: var(--muted); font-size: 12px; }
+.chartwrap { position: relative; height: 420px; }
+.chartwrap.small { height: 220px; }
+.chartwrap canvas { width: 100%; height: 100%; display: block; cursor: crosshair; }
+.tip {
+  position: absolute; pointer-events: none; background: var(--card); border: 1px solid var(--line);
+  border-radius: 8px; padding: 7px 9px; font-size: 12px; box-shadow: var(--shadow); white-space: nowrap; z-index: 2;
+}
+.tip b { font-variant-numeric: tabular-nums; }
+.strips { display: flex; flex-direction: column; gap: 3px; margin-top: 6px; }
+.strip { display: grid; grid-template-columns: 130px 1fr; align-items: center; gap: 8px; font-size: 11px; color: var(--muted); }
+.strip canvas { width: 100%; height: 8px; display: block; border-radius: 3px; }
+
+.guide { background: var(--card); border: 1px solid var(--accent); border-left-width: 4px; border-radius: 12px; padding: 14px 16px; box-shadow: var(--shadow); }
+.guide-text h3 { font-size: 16px; color: var(--ink); margin: 0 0 6px; }
+.guide-text p { margin: 4px 0; }
+.guide-nav { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; }
+
+#score table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+#score th, #score td { padding: 7px 8px; border-bottom: 1px solid var(--line); text-align: right; font-size: 13px; }
+#score th:first-child, #score td:first-child { text-align: left; }
+#score thead th { font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+#score .cur { color: var(--cur); font-weight: 600; }
+#score .ada { color: var(--ada); font-weight: 600; }
+#score .gain { color: var(--ok); font-weight: 600; }
+#score .loss { color: var(--bad); font-weight: 600; }
+.kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+.kpi { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--field); }
+.kpi .k { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.kpi .v { font-size: 20px; font-weight: 700; margin-top: 2px; font-variant-numeric: tabular-nums; }
+.kpi .v small { font-size: 12px; font-weight: 500; color: var(--muted); }
+.foot { color: var(--muted); font-size: 12px; padding: 4px 20px 24px; }
+
+@media (max-width: 980px) {
+  .layout { grid-template-columns: minmax(0, 1fr); padding: 12px 16px; }
+  .stage { order: -1; }
+  #score { overflow-x: auto; }
+  .top { padding: 12px 16px; }
+  .chartwrap { height: 320px; }
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .hint { display: none; }
+}
+@media (max-width: 480px) {
+  .row4 { grid-template-columns: repeat(2, 1fr); }
+  .row3 { grid-template-columns: repeat(2, 1fr); }
+  .strip { grid-template-columns: 100px 1fr; }
+}
+
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <div class="logo" aria-hidden="true"></div>
+    <div>
+      <h1>Simulador de filtragem da balança</h1>
+      <p class="sub">Filtro atual × filtragem adaptativa para carregamento — FieldSense</p>
+    </div>
+  </div>
+  <nav class="tour" id="tour" aria-label="Roteiro">
+    <button data-step="1">1 · O problema</button>
+    <button data-step="2">2 · Filtro atual</button>
+    <button data-step="3">3 · Adaptativo</button>
+    <button data-step="4">4 · Resultados</button>
+    <button data-step="0" class="free">Explorar</button>
+  </nav>
+</header>
+
+<main class="layout">
+  <aside class="panel" id="panel">
+    <section class="box">
+      <h2>Cenário</h2>
+      <label class="row">Exemplo
+        <select id="scenario"></select>
+      </label>
+      <div class="row2">
+        <label>Peso inicial (kg)<input type="number" id="w0" step="10"></label>
+        <label>Duração (s)<input type="number" id="dur" step="10" min="10"></label>
+      </div>
+      <div class="filebox">
+        <label class="btn small" for="csv">Carregar CSV de campo…</label>
+        <input type="file" id="csv" accept=".csv,.txt,text/csv" hidden>
+        <button class="btn small ghost" id="csvClear" hidden>Voltar ao sintético</button>
+      </div>
+      <div id="csvInfo" class="note" hidden></div>
+      <div id="csvCols" class="row2" hidden>
+        <label>Coluna de tempo<select id="csvT"></select></label>
+        <label>Coluna de peso<select id="csvW"></select></label>
+      </div>
+    </section>
+
+    <section class="box" id="boxLoads">
+      <h2>Cargas</h2>
+      <table class="ev">
+        <thead><tr><th>Início (s)</th><th>Tipo</th><th>kg</th><th>Duração (s)</th><th></th></tr></thead>
+        <tbody id="evBody"></tbody>
+      </table>
+      <button class="btn small" id="evAdd">+ Adicionar carga</button>
+      <p class="note">Pá: material cai na duração indicada (com impacto). Rampa: esteira/rosca. Descarga: saída de ração no trato. Rampa e descarga seguem a “vazão irregular” das perturbações.</p>
+    </section>
+
+    <section class="box" id="boxDist">
+      <h2>Perturbações</h2>
+      <label class="chk"><input type="checkbox" id="vibOn"> Vibração do misturador</label>
+      <div class="row3">
+        <label>Amplitude (± kg)<input type="number" id="vibA" step="5" min="0"></label>
+        <label>Frequência (Hz)<input type="number" id="vibF" step="0.1" min="0.1"></label>
+        <label>Harmônica (%)<input type="number" id="vibH" step="5" min="0" max="100"></label>
+      </div>
+      <div class="row2">
+        <label>Liga em (s)<input type="number" id="vibT0" step="5" min="0"></label>
+        <label>Desliga em (s)<input type="number" id="vibT1" step="5" min="0"></label>
+      </div>
+      <div class="row3">
+        <label>Ruído (± kg)<input type="number" id="noise" step="1" min="0"></label>
+        <label>Impactos/min<input type="number" id="impR" step="1" min="0"></label>
+        <label>Impacto (kg)<input type="number" id="impA" step="10" min="0"></label>
+      </div>
+      <h3>Vagão em movimento</h3>
+      <div class="row2">
+        <label>Balanço (± kg)<input type="number" id="swayA" step="10" min="0"></label>
+        <label>Período do balanço (s)<input type="number" id="swayT" step="0.5" min="0.5"></label>
+      </div>
+      <div class="row3">
+        <label>Solavancos/min<input type="number" id="bumpR" step="1" min="0"></label>
+        <label>Solavanco (kg)<input type="number" id="bumpA" step="10" min="0"></label>
+        <label>Vazão irregular (%)<input type="number" id="flowIrr" step="10" min="0" max="90"></label>
+      </div>
+      <div class="row2">
+        <label>Deriva (kg/min)<input type="number" id="drift" step="1"></label>
+        <label>Semente<input type="number" id="seed" step="1"></label>
+      </div>
+    </section>
+
+    <section class="box">
+      <h2>Filtro (como no Tuner)</h2>
+      <label class="row">Preset
+        <select id="preset">
+          <option value="0">Rápido</option>
+          <option value="1">Médio</option>
+          <option value="2">Lento</option>
+          <option value="3">Carregamento</option>
+          <option value="9">Personalizado</option>
+        </select>
+      </label>
+      <details id="tuner">
+        <summary>Parâmetros do preset</summary>
+        <div class="row2">
+          <label>Núcleo<select id="p_core"><option value="1">Butterworth 2ª ordem</option><option value="0">RC 1ª ordem</option></select></label>
+          <label>Cutoff (Hz)<input type="number" id="p_fc" step="0.1" min="0.1" max="10"></label>
+        </div>
+        <div class="row2">
+          <label>Média móvel (s)<input type="number" id="p_ma" step="0.1" min="0.1" max="5"></label>
+          <label class="chk inl"><input type="checkbox" id="p_med"> Mediana</label>
+        </div>
+        <h3>Slew IIR</h3>
+        <label class="chk"><input type="checkbox" id="p_acc_iir"> Acelerado</label>
+        <div class="row4">
+          <label>Slew<input type="number" id="p_sl_iir" step="10" min="0"></label>
+          <label>v0<input type="number" id="p_v0_iir" step="5" min="0"></label>
+          <label>a<input type="number" id="p_a_iir" step="10" min="0"></label>
+          <label>vmax<input type="number" id="p_vm_iir" step="10" min="0"></label>
+        </div>
+        <h3>Slew MA</h3>
+        <label class="chk"><input type="checkbox" id="p_acc_ma"> Acelerado</label>
+        <div class="row4">
+          <label>Slew<input type="number" id="p_sl_ma" step="10" min="0"></label>
+          <label>v0<input type="number" id="p_v0_ma" step="5" min="0"></label>
+          <label>a<input type="number" id="p_a_ma" step="10" min="0"></label>
+          <label>vmax<input type="number" id="p_vm_ma" step="10" min="0"></label>
+        </div>
+        <h3>Exibição e estabilidade</h3>
+        <div class="row4">
+          <label>Casas<input type="number" id="p_dec" step="1" min="0" max="3"></label>
+          <label>Divisão<input type="number" id="p_div" step="1" min="0"></label>
+          <label>Janela<input type="number" id="p_sw" step="1" min="1" max="10"></label>
+          <label>Tol. (kg)<input type="number" id="p_st" step="1" min="0"></label>
+        </div>
+      </details>
+    </section>
+
+    <section class="box">
+      <h2>Filtragem adaptativa</h2>
+      <label class="chk"><input type="checkbox" id="adOn" checked> Mostrar comparação</label>
+      <label class="row">Sensibilidade <output id="sensOut"></output>
+        <input type="range" id="sens" min="0" max="1" step="0.05">
+      </label>
+      <p class="note">Mais sensível: entra no modo rápido com cargas menores. Menos sensível: mais imune a vibração forte.</p>
+    </section>
+
+  </aside>
+
+  <section class="stage">
+    <div class="guide" id="guide" hidden>
+      <div class="guide-text" id="guideText"></div>
+      <div class="guide-nav">
+        <button class="btn ghost" id="gPrev">◀ Anterior</button>
+        <button class="btn" id="gNext">Próximo ▶</button>
+      </div>
+    </div>
+
+    <div class="card chartcard">
+      <div class="chart-head">
+        <div class="legend" id="legend"></div>
+        <div class="chart-tools">
+          <span class="hint">Arraste para ampliar · duplo clique para restaurar</span>
+          <button class="btn small ghost" id="zoomReset">Ver tudo</button>
+        </div>
+      </div>
+      <div class="chartwrap"><canvas id="chart"></canvas><div class="tip" id="tip" hidden></div></div>
+    </div>
+
+    <div class="card" id="scoreCard">
+      <h2>Placar</h2>
+      <div id="score"></div>
+      <p class="note" id="scoreNote"></p>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">Simulação do comportamento do filtro a 20 leituras por segundo, com o mesmo cálculo do equipamento. Resultados de campo podem variar; use “Carregar CSV” para reprocessar registros reais.</footer>
+
+<script>
+const MOTOR_WASM_B64 = "AGFzbQEAAAABJQdgAAF/YAF/AX9gAX8AYAR/f39/AGACf3wAYAN/fH8AYAF8AXwDDQwAAAABAQIDBAUDBgYEBQFwAQEBBQYBAYACgAIGCAF/AUGAgAQLBx4GBm1lbW9yeQIAAWEAAAFiAAEBZQACAWQAAwFjAAQKm0wMCABBgICEgAALCABBgISEgAALBgBBwLIECxgAIABBgMoRbEGAmKeAAGpBACAAQQdJGwuMBwMDfwF8AX8jgICAgABB8ANrIgEkgICAgAACQAJAIABBAU4NAEEAIQIMAQtBACEDIAFBACsDgICEgAA5A+gCIAFBACsDoICEgAA5A4ADIAFBACsDqICEgAA5A4gDIAFBACsDsICEgAA5A5ADIAFBACsDuICEgAA5A5gDIAFBACsDiICEgAD8AjYC8AIgAUEAKwOQgISAAEQAAAAAAAAAAGI2AvQCIAFBACsDmICEgABEAAAAAAAAAABiNgL4AiABQQArA8CAhIAARAAAAAAAAAAAYjYCoAMgAUEAKwPIgISAADkDqAMgAUEAKwPQgISAADkDsAMgAUEAKwPYgISAADkDuAMgAUEAKwPggISAADkDwAMgAUEAKwPogISAADkDyAMgAUEAKwP4gISAADkD2AMgAUEAKwOIgYSAADkD6AMgAUEAKwPwgISAAPwCNgLQAyABQQArA4CBhIAA/AI2AuADIAFB8AFqEIWAgIAAIAEgASsDkAJEAAAAAAAA+D9EAAAAAAAA8D9EAAAAAAAAAABBACsDmIGEgAAiBCAERAAAAAAAAAAAYxsiBCAERAAAAAAAAPA/ZBuhIgSiOQOQAiABIAErA5gCIASiOQOYAiABIAErA6ACIASiOQOgAiABRM3MzMzMzOw/RDMzMzMzM9M/IAQgASsDgAKiIgQgBEQzMzMzMzPTP2MbIgQgBETNzMzMzMzsP2QbOQOAAkGAnqKBACABQegCakEAQQAQhoCAgABBmMOigQAgAUHoAmpBASABQfABahCGgICAAEGAnqKBAEEAKwOAhISAABCHgICAAEGYw6KBAEEAKwOAhISAABCHgICAACAAQcCyBCAAQcCyBEkbIgJBAnQhBUGAhISAACEAA0BBgJ6igQAgACsDACABQfgAahCIgICAAEGYw6KBACAAKwMAIAEQiICAgAAgA0GAmKeAAGogASsDqAG2OAIAIANBgOK4gABqQwAAgD9DAAAAACABLQCwARs4AgAgA0GArMqAAGogASsDMLY4AgAgA0GA9tuAAGpDAACAP0MAAAAAIAEtADgbOAIAIANBgIr/gABqIAErA6ABtjgCACADQYDUkIEAaiABKwMotjgCACADQYDA7YAAakMAAIA/QwAAAAAgASsDQER7FK5H4XqUP2QbOAIAIABBCGohACAFIANBBGoiA0cNAAsLIAFB8ANqJICAgIAAIAIL5wEAIABCgICAgICAgPA/NwNwIABCgICAgICAgPw/NwNoIABCgICAgICAgITAADcDYCAAQoCAgICAgID4PzcDWCAAQoCAgICAgICEwAA3A1AgAEKz5syZs+bM6T83A0ggAEKas+bMmbPm7D83A0AgAEKAgICAgICA6D83AzggAEKAgICAgICAl8AANwMwIABCgICAgICAgPw/NwMoIABCgICAgICAgPg/NwMgIABC5syZs+bMmes/NwMYIABCs+bMmbPmzPE/NwMQIABCgICAgICAgITAADcDCCAAQoCAgICAgID4PzcDAAvCBgQBfwF8A30BfEEAIQQDQCAAIARqQgA3AAAgBEEIaiIEQZglRw0ACyAAIAFBiAH8CgAAIAAgAjoAiAECQAJAIANFDQAgAEGQAWogA0H4APwKAAAMAQsgAEKAgICAgICA8D83A4ACIABCgICAgICAgPw/NwP4ASAAQoCAgICAgICEwAA3A/ABIABCgICAgICAgPg/NwPoASAAQoCAgICAgICEwAA3A+ABIABCs+bMmbPmzOk/NwPYASAAQpqz5syZs+bsPzcD0AEgAEKAgICAgICA6D83A8gBIABCgICAgICAgJfAADcDwAEgAEKAgICAgICA/D83A7gBIABCgICAgICAgPg/NwOwASAAQubMmbPmzJnrPzcDqAEgAEKz5syZs+bM8T83A6ABIABCgICAgICAgITAADcDmAEgAEKAgICAgICA+D83A5ABCyAAQ/2tgDwgASsDACIFtkMAAABAIAVEAAAAAAAAAABkGyIGQ9sPSUCUQwAAoEGVIAZDAAAAAF8buxCLgICAALYiBkPzBLW/lEMAAIA/kiAGIAaUIgeSQwAAgD8gBkPzBLU/lEMAAIA/kiAHkpUiBpQ4ArQCIAAgB0MAAIC/kiIIIAiSIAaUOAKwAiAAIAcgBpQiBjgCrAIg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";
+'use strict';
+/* Simulador de filtragem — interface. O filtro roda no módulo compilado;
+ * aqui ficam a geração de sinais, o gráfico e as métricas. */
+
+const DT = 0.05;
+const XMODE = false;
+
+/* ---------------------------------------------------------------- presets */
+const PRESETS = [
+  { name: 'Rápido', core: 1, fc: 10, med: 1, accI: 1, slI: 120, v0I: 80, aI: 400, vmI: 800, accM: 1, slM: 120, v0M: 60, aM: 300, vmM: 600, ma: 0.5 },
+  { name: 'Médio', core: 1, fc: 6, med: 1, accI: 1, slI: 80, v0I: 40, aI: 200, vmI: 400, accM: 1, slM: 80, v0M: 30, aM: 150, vmM: 300, ma: 1.0 },
+  { name: 'Lento', core: 1, fc: 3, med: 1, accI: 1, slI: 40, v0I: 20, aI: 100, vmI: 200, accM: 1, slM: 40, v0M: 20, aM: 80, vmM: 150, ma: 2.0 },
+  { name: 'Carregamento', core: 1, fc: 2, med: 1, accI: 1, slI: 160, v0I: 0, aI: 200, vmI: 400, accM: 1, slM: 80, v0M: 11, aM: 150, vmM: 300, ma: 3.0 },
+];
+const DISPLAY_DEFAULT = { dec: 0, div: 1, sw: 5, st: 10 };
+
+/* ------------------------------------------------------------- cenários */
+const VIB = (a, f, h = 30, t0 = 0, t1 = 1e9) => ({ vibOn: true, vibA: a, vibF: f, vibH: h, vibT0: t0, vibT1: t1 });
+/* perturbações do vagão em movimento: desligadas salvo indicação */
+const D_DEFAULT = { swayA: 0, swayT: 3.5, bumpR: 0, bumpA: 200, flowIrr: 0 };
+const SCENARIOS = [
+  {
+    name: 'Trato completo (misturador ligado)', w0: 800, dur: 240,
+    ev: [['pa', 20, 900, 2], ['pa', 45, 1100, 2], ['rampa', 75, 1500, 25], ['pa', 125, 150, 1], ['pa', 150, 60, 1], ['rampa', 175, 600, 12]],
+    d: { ...VIB(35, 1.1), noise: 6, impR: 2, impA: 120, drift: 0, seed: 11 },
+  },
+  {
+    name: 'Pá carregadeira', w0: 2000, dur: 100,
+    ev: [['pa', 20, 800, 1.5], ['pa', 45, 1200, 2], ['pa', 70, 600, 1]],
+    d: { ...VIB(30, 1.0), noise: 5, impR: 0, impA: 100, drift: 0, seed: 3 },
+  },
+  {
+    name: 'Esteira / rosca', w0: 1000, dur: 120,
+    ev: [['rampa', 20, 1500, 30], ['rampa', 80, 400, 15]],
+    d: { ...VIB(30, 1.2), noise: 5, impR: 0, impA: 100, drift: 0, seed: 5 },
+  },
+  {
+    name: 'Ingredientes pequenos', w0: 3000, dur: 110,
+    ev: [['pa', 20, 100, 1], ['pa', 45, 50, 1], ['pa', 70, 200, 1.5]],
+    d: { ...VIB(25, 1.1), noise: 4, impR: 0, impA: 100, drift: 0, seed: 8 },
+  },
+  {
+    name: 'Mistura sem carga (vibração forte)', w0: 6000, dur: 120,
+    ev: [],
+    d: { ...VIB(60, 0.8, 40), noise: 8, impR: 4, impA: 150, drift: 0, seed: 21 },
+  },
+  {
+    name: 'Trato: distribuição com o vagão andando', w0: 6500, dur: 200,
+    ev: [['descarga', 15, -1800, 30], ['descarga', 70, -2200, 35], ['descarga', 130, -1500, 25]],
+    d: { ...VIB(40, 1.1), noise: 8, impR: 2, impA: 120, drift: 0, seed: 13, swayA: 70, swayT: 3.5, bumpR: 5, bumpA: 250, flowIrr: 50 },
+  },
+  {
+    name: 'Degrau limpo (laboratório)', w0: 0, dur: 60,
+    ev: [['pa', 10, 1000, 0.05]],
+    d: { vibOn: false, vibA: 0, vibF: 1, vibH: 0, vibT0: 0, vibT1: 1e9, noise: 0, impR: 0, impA: 0, drift: 0, seed: 1 },
+  },
+];
+const EV_TYPES = { pa: 'Pá', rampa: 'Rampa', descarga: 'Descarga' };
+
+
+
+/* ---------------------------------------------------------------- estado */
+const S = {
+  scen: 0, w0: 0, dur: 0, events: [], d: {},
+  preset: 3, p: {}, sens: 0.5, adOn: true,
+  csv: null,
+  view: null,          /* [i0, i1] visível */
+  hide: new Set(),
+  step: 0,
+  res: null,
+};
+
+/* ----------------------------------------------------------------- motor */
+let M = null;
+async function loadMotor() {
+  const bin = Uint8Array.from(atob(MOTOR_WASM_B64), c => c.charCodeAt(0));
+  const { instance } = await WebAssembly.instantiate(bin, {});
+  const ex = instance.exports;
+  M = { ex, max: ex.e() };
+}
+
+function runMotor(input) {
+  const ex = M.ex, buf = ex.memory.buffer;
+  const n = Math.min(input.length, M.max);
+  const c = new Float64Array(buf, ex.a(), 64);
+  c.fill(0);
+  const p = S.p;
+  c[0] = p.fc; c[1] = p.core; c[2] = p.med;
+  c[3] = p.accI; c[4] = p.slI; c[5] = p.v0I; c[6] = p.aI; c[7] = p.vmI;
+  c[8] = p.accM; c[9] = p.slM; c[10] = p.v0M; c[11] = p.aM; c[12] = p.vmM;
+  c[13] = p.ma; c[14] = p.dec; c[15] = p.div; c[16] = p.sw; c[17] = p.st;
+  c[19] = S.sens;
+  
+  new Float64Array(buf, ex.b(), n).set(input.subarray(0, n));
+  ex.c(n);
+  const out = k => new Float32Array(buf, ex.d(k), n).slice();
+  const r = { n, wA: out(0), sA: out(1), wB: out(2), sB: out(3), fast: out(4), maA: out(5), maB: out(6) };
+  
+  return r;
+}
+
+/* ------------------------------------------------------ geração de sinal */
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+function generate() {
+  const n = Math.min(Math.round(S.dur / DT) + 1, M.max);
+  const truth = new Float64Array(n), input = new Float64Array(n);
+  const d = S.d, rnd = mulberry32(d.seed | 0 || 1);
+  const gauss = () => { const u = rnd() || 1e-9, v = rnd(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
+  const ph1 = rnd() * 6.283, ph2 = rnd() * 6.283;
+
+  /* impactos isolados: meio seno de 0,15 s */
+  const imp = [];
+  if (d.impR > 0 && d.impA > 0) {
+    const p = d.impR / 60 * DT;
+    for (let i = 0; i < n; i++) if (rnd() < p) imp.push([i * DT, d.impA * (0.5 + 0.5 * rnd()) * (rnd() < 0.5 ? -1 : 1)]);
+  }
+
+  /* solavancos do terreno: a suspensão oscila ~2 Hz e amortece em ~1 s */
+  const bumps = [];
+  if (d.bumpR > 0 && d.bumpA > 0) {
+    const p = d.bumpR / 60 * DT;
+    for (let i = 0; i < n; i++) if (rnd() < p) bumps.push([i * DT, d.bumpA * (0.4 + 0.6 * rnd()) * (rnd() < 0.5 ? -1 : 1), 1.6 + 0.8 * rnd()]);
+  }
+  const phS1 = rnd() * 6.283, phS2 = rnd() * 6.283;
+
+  const evs = S.events.map(e => ({ ...e, kg: e.type === 'descarga' ? -Math.abs(e.kg) : e.kg, dur: Math.max(e.dur, DT) }));
+  /* vazão irregular em rampa/descarga: fração acumulada com taxa variável */
+  const irr = Math.min(0.9, Math.max(0, (d.flowIrr || 0) / 100));
+  for (const e of evs) {
+    if (e.type === 'pa' || irr <= 0) continue;
+    const m = Math.max(1, Math.round(e.dur / DT)), f1 = rnd() * 6.283, f2 = rnd() * 6.283;
+    const cum = new Float64Array(m + 1);
+    for (let k = 1; k <= m; k++) {
+      const t = k * DT;
+      const rate = 1 + irr * (0.6 * Math.sin(2 * Math.PI * t / 4.3 + f1) + 0.4 * Math.sin(2 * Math.PI * t / 1.9 + f2));
+      cum[k] = cum[k - 1] + Math.max(0.05, rate);
+    }
+    for (let k = 0; k <= m; k++) cum[k] /= cum[m];
+    e.cum = cum;
+  }
+  for (let i = 0; i < n; i++) {
+    const t = i * DT;
+    let w = S.w0, x = 0;
+    for (const e of evs) {
+      const u = (t - e.t0) / e.dur;
+      if (u > 0) w += e.kg * (u >= 1 ? 1 : e.cum ? e.cum[Math.round(u * (e.cum.length - 1))] : u);
+      if (e.type === 'pa') { /* repique da caçamba ao assentar */
+        const tau = t - (e.t0 + e.dur);
+        if (tau >= 0 && tau < 3) x += 0.10 * e.kg * Math.exp(-tau / 0.35) * Math.sin(2 * Math.PI * 2.5 * tau);
+      }
+    }
+    truth[i] = w;
+    if (d.vibOn && t >= d.vibT0 && t <= d.vibT1) {
+      const env = Math.min(1, (t - d.vibT0) / 1.5, (d.vibT1 - t) / 1.5);
+      const a = d.vibA * (1 + 0.15 * Math.sin(2 * Math.PI * 0.05 * t));
+      x += env * (a * Math.sin(2 * Math.PI * d.vibF * t + ph1) + (d.vibH / 100) * a * Math.sin(4 * Math.PI * d.vibF * t + ph2));
+    }
+    if (d.swayA > 0 && d.swayT > 0) /* balanço do vagão no terreno */
+      x += d.swayA * (0.7 * Math.sin(2 * Math.PI * t / d.swayT + phS1) + 0.3 * Math.sin(2 * Math.PI * t / (d.swayT * 1.618) + phS2));
+    for (const [tb, a, f] of bumps) { const tau = t - tb; if (tau >= 0 && tau < 2.5) x += a * Math.exp(-tau / 0.45) * Math.sin(2 * Math.PI * f * tau); }
+    if (d.noise > 0) x += (d.noise / 2) * gauss();
+    for (const [ti, a] of imp) { const u = (t - ti) / 0.15; if (u >= 0 && u <= 1) x += a * Math.sin(Math.PI * u); }
+    x += d.drift / 60 * t;
+    input[i] = w + x;
+  }
+  return { n, truth, input, evs };
+}
+
+/* ------------------------------------------------------------------- CSV */
+function parseCSV(text) {
+  const lines = text.split(/\r?\n/).filter(l => l.trim().length);
+  if (lines.length < 3) throw new Error('arquivo sem dados');
+  const head = lines[0];
+  const delim = [';', '\t', ','].map(c => [c, head.split(c).length]).sort((a, b) => b[1] - a[1])[0][0];
+  const num = s => { s = s.trim().replace(/^"|"$/g, ''); if (delim !== ',') s = s.replace(',', '.'); return s === '' ? NaN : Number(s); };
+  const first = head.split(delim);
+  const hasHeader = first.some(s => isNaN(num(s)));
+  const names = hasHeader ? first.map(s => s.trim().replace(/^"|"$/g, '')) : first.map((_, i) => 'Coluna ' + (i + 1));
+  const cols = names.map(() => []);
+  for (let li = hasHeader ? 1 : 0; li < lines.length; li++) {
+    const parts = lines[li].split(delim);
+    if (parts.length < names.length) continue;
+    names.forEach((_, ci) => cols[ci].push(num(parts[ci])));
+  }
+  const numeric = names.map((nm, i) => ({ nm, i, ok: cols[i].filter(v => !isNaN(v)).length > cols[i].length * 0.9 })).filter(c => c.ok);
+  if (!numeric.length) throw new Error('nenhuma coluna numérica');
+  const tGuess = numeric.find(c => /^(t|t_ms|ms|tempo|time|timestamp|hora)/i.test(c.nm));
+  const wGuess = numeric.find(c => /^(in|peso|weight|kg|raw|entrada)/i.test(c.nm)) || numeric.find(c => c !== tGuess) || numeric[0];
+  return { names, cols, numeric, ti: tGuess ? tGuess.i : -1, wi: wGuess.i };
+}
+
+function csvSeries() {
+  const c = S.csv, w = c.cols[c.wi];
+  let t;
+  if (c.ti >= 0) {
+    t = c.cols[c.ti].slice();
+    const steps = []; for (let i = 1; i < Math.min(t.length, 200); i++) steps.push(t[i] - t[i - 1]);
+    steps.sort((a, b) => a - b);
+    const med = steps[steps.length >> 1] || 1;
+    const isMs = /ms/i.test(c.names[c.ti]) || med > 5;
+    t = t.map(v => (isMs ? v / 1000 : v) - (isMs ? t[0] / 1000 : t[0]));
+  } else t = w.map((_, i) => i * DT);
+  const tEnd = t[t.length - 1];
+  const n = Math.min(Math.floor(tEnd / DT) + 1, M.max);
+  const input = new Float64Array(n);
+  let j = 0, last = w.find(v => !isNaN(v)) || 0;
+  for (let i = 0; i < n; i++) { /* amostra e retém, como o equipamento a 20 Hz */
+    const ti = i * DT;
+    while (j < t.length && t[j] <= ti + 1e-9) { if (!isNaN(w[j])) last = w[j]; j++; }
+    input[i] = last;
+  }
+  return { n, truth: null, input, evs: [], truncated: tEnd / DT + 1 > M.max };
+}
+
+/* --------------------------------------------------------------- métricas */
+/* trechos sem carga: 8 s após o fim de uma carga até 0,5 s antes da próxima */
+function quietWindows(evs, n) {
+  const wins = [];
+  let start = 10;
+  evs.forEach(e => { wins.push([start, e.t0 - 0.5]); start = e.t0 + e.dur + 8; });
+  wins.push([start, (n - 1) * DT]);
+  return wins.filter(([a, b]) => b - a >= 3).map(([a, b]) => [Math.round(a / DT), Math.round(b / DT)]);
+}
+function quietPP(sig, w, evs, n) {
+  let pp = null;
+  for (const [i0, i1] of quietWindows(evs, n)) {
+    let mn = Infinity, mx = -Infinity;
+    for (let i = i0; i <= i1; i++) { mn = Math.min(mn, w[i]); mx = Math.max(mx, w[i]); }
+    pp = Math.max(pp ?? 0, mx - mn);
+  }
+  return pp;
+}
+
+function prefix(a) { const p = new Float64Array(a.length + 1); for (let i = 0; i < a.length; i++) p[i + 1] = p[i] + a[i]; return p; }
+
+function metrics(sig, r) {
+  if (!sig.truth) return null;
+  const n = r.n, div = Math.max(S.p.div || 0, 0.001);
+  const evs = sig.evs.filter(e => e.t0 < (n - 1) * DT).sort((a, b) => a.t0 - b.t0);
+  const filters = [['A', r.wA, null], ['B', r.wB, r.fast]];
+  const res = { events: [], quiet: { A: null, B: null }, false: { A: 0, B: 0 } };
+  const P = { A: prefix(r.wA), B: prefix(r.wB) };
+  const quietA = quietPP(sig, r.wA, evs, n);
+  const cmean = (k, i) => { const a = Math.max(0, i - 10), b = Math.min(n - 1, i + 10); return (P[k][b + 1] - P[k][a]) / (b - a + 1); };
+
+  evs.forEach((e, idx) => {
+    const iS = Math.round(e.t0 / DT), iE = Math.min(n - 1, Math.round((e.t0 + e.dur) / DT));
+    const iN = idx + 1 < evs.length ? Math.round(evs[idx + 1].t0 / DT) : n;
+    const fin = sig.truth[Math.max(iS, iN - 11)];
+    /* tempo até 95 %: mesma faixa para os dois — 5 % da carga, 2 divisões ou a
+     * oscilação parada do filtro atual (a leitura não fica mais quieta que isso) */
+    const tol = Math.max(0.05 * Math.abs(e.kg), 2 * div, quietA || 0);
+    const row = { e, idx };
+    for (const [k, w] of filters) {
+      let lastOut = -1;
+      for (let i = iS; i < iN; i++) if (Math.abs(cmean(k, i) - fin) > tol) lastOut = i;
+      const arrived = lastOut < iN - 21;
+      const iArr = lastOut + 1;
+      let over = 0;
+      const sg = Math.sign(e.kg) || 1;
+      for (let i = iE; i < iN; i++) over = Math.max(over, (w[i] - fin) * sg);
+      let mn = Infinity, mx = -Infinity;
+      for (let i = iArr; i < Math.min(iN, iArr + 100); i++) { mn = Math.min(mn, w[i]); mx = Math.max(mx, w[i]); }
+      row[k] = { t: arrived ? Math.max(0, (iArr - iE) * DT) : null, tMax: (iN - iE) * DT, over, pp: arrived && isFinite(mx) ? mx - mn : null };
+      if (e.type !== 'pa' && e.dur >= 3) {
+        /* rampa/descarga: atraso médio da leitura na segunda metade da entrada */
+        const a = Math.round((iS + iE) / 2);
+        let lag = 0;
+        for (let i = a; i <= iE; i++) lag += (sig.truth[i] - cmean(k, i)) * sg;
+        lag /= Math.max(1, iE - a + 1);
+        /* oscilação da leitura em torno do peso real (sem o atraso médio) */
+        let dmn = Infinity, dmx = -Infinity;
+        for (let i = a; i <= iE; i++) { const dv = (w[i] - sig.truth[i]) * sg + lag; dmn = Math.min(dmn, dv); dmx = Math.max(dmx, dv); }
+        row[k].ramp = true;
+        row[k].lagKg = lag;
+        row[k].osc = (dmx - dmn) / 2;
+        row[k].t = Math.max(0, lag / (Math.abs(e.kg) / e.dur));
+      }
+    }
+    res.events.push(row);
+  });
+
+  for (const [i0, i1] of quietWindows(evs, n)) {
+    for (const [k, w, f] of filters) {
+      let mn = Infinity, mx = -Infinity;
+      for (let i = i0; i <= i1; i++) { mn = Math.min(mn, w[i]); mx = Math.max(mx, w[i]); }
+      res.quiet[k] = Math.max(res.quiet[k] ?? 0, mx - mn);
+      if (f) {
+        let prev = 0;
+        for (let i = i0; i <= i1; i++) { if (f[i] > 0 && !prev) res.false[k]++; prev = f[i]; }
+      }
+    }
+  }
+  return res;
+}
+
+/* --------------------------------------------------------------------- UI */
+const $ = id => document.getElementById(id);
+const fmt = (v, d = 1) => v == null || !isFinite(v) ? '—' : v.toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d });
+const fmtKg = v => fmt(v, S.p.dec || 0) + ' kg';
+
+function loadScenario(i) {
+  const sc = SCENARIOS[i];
+  S.scen = i; S.w0 = sc.w0; S.dur = sc.dur;
+  S.events = sc.ev.map(([type, t0, kg, dur]) => ({ type, t0, kg, dur }));
+  S.d = { ...D_DEFAULT, ...sc.d };
+  S.view = null;
+  syncInputs();
+}
+
+function setPreset(i) {
+  S.preset = i;
+  if (i < 4) S.p = { ...PRESETS[i], ...DISPLAY_DEFAULT, dec: S.p.dec ?? 0, div: S.p.div ?? 1, sw: S.p.sw ?? 5, st: S.p.st ?? 10 };
+  syncInputs();
+}
+
+const P_FIELDS = { p_core: 'core', p_fc: 'fc', p_ma: 'ma', p_sl_iir: 'slI', p_v0_iir: 'v0I', p_a_iir: 'aI', p_vm_iir: 'vmI', p_sl_ma: 'slM', p_v0_ma: 'v0M', p_a_ma: 'aM', p_vm_ma: 'vmM', p_dec: 'dec', p_div: 'div', p_sw: 'sw', p_st: 'st' };
+const P_CHECKS = { p_med: 'med', p_acc_iir: 'accI', p_acc_ma: 'accM' };
+const D_FIELDS = ['vibA', 'vibF', 'vibH', 'vibT0', 'vibT1', 'noise', 'impR', 'impA', 'drift', 'seed', 'swayA', 'swayT', 'bumpR', 'bumpA', 'flowIrr'];
+
+function syncInputs() {
+  $('scenario').value = S.scen;
+  $('w0').value = S.w0; $('dur').value = S.dur;
+  $('vibOn').checked = !!S.d.vibOn;
+  D_FIELDS.forEach(k => { $(k).value = S.d[k] > 1e8 ? S.dur : S.d[k]; });
+  $('preset').value = S.preset;
+  Object.entries(P_FIELDS).forEach(([id, k]) => { $(id).value = S.p[k]; });
+  Object.entries(P_CHECKS).forEach(([id, k]) => { $(id).checked = !!S.p[k]; });
+  $('sens').value = S.sens; $('sensOut').textContent = Math.round(S.sens * 100) + '%';
+  $('adOn').checked = S.adOn;
+  renderEvents();
+}
+
+function renderEvents() {
+  const tb = $('evBody');
+  tb.innerHTML = '';
+  S.events.forEach((e, i) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td><input type="number" step="1" min="0" data-k="t0" value="${e.t0}"></td>
+      <td><select data-k="type">${Object.entries(EV_TYPES).map(([k, v]) => `<option value="${k}"${k === e.type ? ' selected' : ''}>${v}</option>`).join('')}</select></td>
+      <td><input type="number" step="10" data-k="kg" value="${e.kg}"></td>
+      <td><input type="number" step="0.5" min="0.05" data-k="dur" value="${e.dur}"></td>
+      <td><button class="del" title="Remover" data-del="${i}">×</button></td>`;
+    tr.querySelectorAll('[data-k]').forEach(el => el.addEventListener('change', () => {
+      const k = el.dataset.k;
+      e[k] = k === 'type' ? el.value : +el.value;
+      if (k === 'type' && e.type === 'descarga') e.kg = -Math.abs(e.kg);
+      if (k === 'type' && e.type !== 'descarga') e.kg = Math.abs(e.kg);
+      if (k === 'type') renderEvents();
+      schedule();
+    }));
+    tb.appendChild(tr);
+  });
+  tb.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', () => { S.events.splice(+b.dataset.del, 1); renderEvents(); schedule(); }));
+}
+
+function bind() {
+  const sel = $('scenario');
+  SCENARIOS.forEach((s, i) => sel.add(new Option(s.name, i)));
+  sel.addEventListener('change', () => { loadScenario(+sel.value); schedule(); });
+  $('w0').addEventListener('change', e => { S.w0 = +e.target.value; schedule(); });
+  $('dur').addEventListener('change', e => { S.dur = Math.max(10, Math.min(3600, +e.target.value)); S.view = null; schedule(); });
+  $('vibOn').addEventListener('change', e => { S.d.vibOn = e.target.checked; schedule(); });
+  D_FIELDS.forEach(k => $(k).addEventListener('change', e => { S.d[k] = +e.target.value; schedule(); }));
+  $('evAdd').addEventListener('click', () => {
+    const last = S.events[S.events.length - 1];
+    S.events.push({ type: 'pa', t0: last ? Math.round(last.t0 + last.dur + 20) : 20, kg: 500, dur: 1.5 });
+    renderEvents(); schedule();
+  });
+  $('preset').addEventListener('change', e => { const v = +e.target.value; if (v < 4) setPreset(v); else S.preset = 9; schedule(); });
+  const custom = () => { S.preset = 9; $('preset').value = 9; };
+  Object.entries(P_FIELDS).forEach(([id, k]) => $(id).addEventListener('change', e => {
+    S.p[k] = +e.target.value;
+    if (!['dec', 'div', 'sw', 'st'].includes(k)) custom();
+    schedule();
+  }));
+  Object.entries(P_CHECKS).forEach(([id, k]) => $(id).addEventListener('change', e => { S.p[k] = e.target.checked ? 1 : 0; custom(); schedule(); }));
+  $('sens').addEventListener('input', e => { S.sens = +e.target.value; $('sensOut').textContent = Math.round(S.sens * 100) + '%'; schedule(); });
+  $('adOn').addEventListener('change', e => { S.adOn = e.target.checked; draw(); renderScore(); });
+
+  $('csv').addEventListener('change', async e => {
+    const f = e.target.files[0];
+    if (!f) return;
+    try {
+      S.csv = parseCSV(await f.text());
+      S.csv.file = f.name;
+      const opts = (selEl, cur, allowNone) => {
+        selEl.innerHTML = '';
+        if (allowNone) selEl.add(new Option('(sem tempo: 20 Hz)', -1));
+        S.csv.numeric.forEach(c => selEl.add(new Option(c.nm, c.i)));
+        selEl.value = cur;
+      };
+      opts($('csvT'), S.csv.ti, true); opts($('csvW'), S.csv.wi, false);
+      S.view = null;
+      setTour(0);
+      schedule();
+    } catch (err) {
+      $('csvInfo').hidden = false;
+      $('csvInfo').textContent = 'Não foi possível ler o arquivo: ' + err.message;
+    }
+    e.target.value = '';
+  });
+  $('csvT').addEventListener('change', e => { S.csv.ti = +e.target.value; S.view = null; schedule(); });
+  $('csvW').addEventListener('change', e => { S.csv.wi = +e.target.value; schedule(); });
+  $('csvClear').addEventListener('click', () => { S.csv = null; S.view = null; schedule(); });
+
+  document.querySelectorAll('#tour button').forEach(b => b.addEventListener('click', () => setTour(+b.dataset.step)));
+  $('gPrev').addEventListener('click', () => setTour(Math.max(1, S.step - 1)));
+  $('gNext').addEventListener('click', () => setTour(S.step >= 4 ? 0 : S.step + 1));
+  $('zoomReset').addEventListener('click', () => { S.view = null; draw(); renderScore(); });
+
+  
+  window.addEventListener('resize', () => draw());
+}
+
+let timer = 0;
+function schedule() { clearTimeout(timer); timer = setTimeout(compute, 120); }
+
+function compute() {
+  const csvMode = !!S.csv;
+  $('boxLoads').hidden = csvMode; $('boxDist').hidden = csvMode;
+  $('csvClear').hidden = !csvMode; $('csvCols').hidden = !csvMode;
+  $('scenario').disabled = csvMode; $('w0').disabled = csvMode; $('dur').disabled = csvMode;
+  const sig = csvMode ? csvSeries() : generate();
+  const r = runMotor(sig.input);
+  if (csvMode) {
+    $('csvInfo').hidden = false;
+    $('csvInfo').textContent = `${S.csv.file}: ${fmt(sig.n * DT / 60, 1)} min reprocessados a 20 leituras/s` + (sig.truncated ? ' (limitado a 1 h)' : '') + '.';
+  } else $('csvInfo').hidden = true;
+  S.res = { sig, r, m: metrics(sig, r) };
+  if (S.view && S.view[1] >= r.n) S.view = null;
+  draw();
+  renderScore();
+  if (S.step) renderGuide();
+}
+
+/* --------------------------------------------------------------- gráfico */
+function css(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+
+function seriesList() {
+  const { sig, r } = S.res;
+  const L = [];
+  if (sig.truth) L.push({ id: 'truth', name: 'Peso real', color: css('--truth'), data: sig.truth, dash: [5, 4], w: 1.5 });
+  L.push({ id: 'in', name: sig.truth ? 'Sinal da célula' : 'Registro (entrada)', color: css('--input'), data: sig.input, w: 1 });
+  
+  L.push({ id: 'A', name: 'Filtro atual', color: css('--cur'), data: r.wA, w: 2 });
+  if (S.adOn) L.push({ id: 'B', name: 'Filtragem adaptativa', color: css('--ada'), data: r.wB, w: 2 });
+  return L;
+}
+
+const PAD = { l: 64, r: 14, t: 10, b: 58 };
+let geom = null;
+
+function niceStep(range, target) {
+  const raw = range / Math.max(1, target), mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const f = raw / mag;
+  return (f < 1.5 ? 1 : f < 3.5 ? 2 : f < 7.5 ? 5 : 10) * mag;
+}
+const tLabel = (t, span) => span > 180 ? `${Math.floor(t / 60)}:${String(Math.round(t % 60)).padStart(2, '0')}` : fmt(t, span < 20 ? 1 : 0) + ' s';
+
+function draw() {
+  if (!S.res) return;
+  const cv = $('chart'), wrap = cv.parentElement;
+  const dpr = window.devicePixelRatio || 1, W = wrap.clientWidth, H = wrap.clientHeight;
+  cv.width = W * dpr; cv.height = H * dpr;
+  const g = cv.getContext('2d');
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, W, H);
+  const { r } = S.res, n = r.n;
+  const [i0, i1] = S.view || [0, n - 1];
+  const pw = W - PAD.l - PAD.r, ph = H - PAD.t - PAD.b;
+  const series = seriesList();
+  renderLegend(series);
+
+  /* faixa de y */
+  let lo = Infinity, hi = -Infinity;
+  for (const s of series) {
+    if (S.hide.has(s.id) || (s.defOff && !S.hide.has('!' + s.id))) continue;
+    for (let i = i0; i <= i1; i++) { const v = s.data[i]; if (v < lo) lo = v; if (v > hi) hi = v; }
+  }
+  if (!isFinite(lo)) { lo = 0; hi = 1; }
+  if (hi - lo < 10) { const m = (hi + lo) / 2; lo = m - 5; hi = m + 5; }
+  const padY = (hi - lo) * 0.06; lo -= padY; hi += padY;
+  const X = i => PAD.l + (i - i0) / Math.max(1, i1 - i0) * pw;
+  const Y = v => PAD.t + (1 - (v - lo) / (hi - lo)) * ph;
+  geom = { i0, i1, X, Y, pw, ph, W, H, lo, hi };
+
+  /* grade */
+  g.font = '11px system-ui, sans-serif';
+  g.strokeStyle = css('--grid'); g.fillStyle = css('--muted'); g.lineWidth = 1;
+  const ys = niceStep(hi - lo, 6);
+  g.textAlign = 'right'; g.textBaseline = 'middle';
+  for (let v = Math.ceil(lo / ys) * ys; v <= hi; v += ys) {
+    const y = Math.round(Y(v)) + 0.5;
+    g.beginPath(); g.moveTo(PAD.l, y); g.lineTo(PAD.l + pw, y); g.stroke();
+    g.fillText(fmt(v, ys < 1 ? 1 : 0), PAD.l - 6, y);
+  }
+  const span = (i1 - i0) * DT, xs = niceStep(span, Math.max(3, Math.floor(pw / 90)));
+  g.textAlign = 'center'; g.textBaseline = 'top';
+  for (let t = Math.ceil(i0 * DT / xs) * xs; t <= i1 * DT + 1e-9; t += xs) {
+    const x = Math.round(X(t / DT)) + 0.5;
+    g.beginPath(); g.moveTo(x, PAD.t); g.lineTo(x, PAD.t + ph); g.stroke();
+    g.fillText(tLabel(t, span), x, PAD.t + ph + 4);
+  }
+  g.save(); g.translate(14, PAD.t + ph / 2); g.rotate(-Math.PI / 2); g.textAlign = 'center'; g.fillText('kg', 0, 0); g.restore();
+
+  g.save();
+  g.beginPath(); g.rect(PAD.l, PAD.t, pw, ph); g.clip();
+
+  /* modo rápido */
+  if (S.adOn && !S.hide.has('fast')) {
+    g.fillStyle = css('--fast');
+    let st = -1;
+    for (let i = i0; i <= i1 + 1; i++) {
+      const on = i <= i1 && r.fast[i] > 0;
+      if (on && st < 0) st = i;
+      if (!on && st >= 0) { g.fillRect(X(st), PAD.t, Math.max(1, X(i) - X(st)), ph); st = -1; }
+    }
+  }
+
+  for (const s of series) {
+    if (S.hide.has(s.id) || (s.defOff && !S.hide.has('!' + s.id))) continue;
+    g.strokeStyle = s.color; g.lineWidth = s.w; g.globalAlpha = s.op || 1;
+    g.setLineDash(s.dash || []);
+    plotLine(g, s.data, i0, i1, X, Y, pw);
+    g.globalAlpha = 1;
+  }
+  g.setLineDash([]);
+  g.restore();
+
+  /* faixas de estabilidade */
+  const strips = [['Estável · atual', r.sA, css('--cur')]];
+  if (S.adOn) strips.push(['Estável · adaptativo', r.sB, css('--ada')]);
+  strips.forEach(([, data, color], k) => {
+    const y = PAD.t + ph + 22 + k * 14;
+    g.fillStyle = css('--grid'); g.fillRect(PAD.l, y, pw, 8);
+    g.fillStyle = color;
+    let st = -1;
+    for (let i = i0; i <= i1 + 1; i++) {
+      const on = i <= i1 && data[i] > 0;
+      if (on && st < 0) st = i;
+      if (!on && st >= 0) { g.fillRect(X(st), y, Math.max(1, X(i) - X(st)), 8); st = -1; }
+    }
+  });
+  g.fillStyle = css('--muted'); g.textAlign = 'right'; g.textBaseline = 'middle';
+  g.fillText('estável', PAD.l - 6, PAD.t + ph + 22 + (strips.length - 1) * 7 + 4);
+
+  if (sel) {
+    g.fillStyle = 'rgba(120,140,160,0.15)';
+    g.fillRect(Math.min(sel.a, sel.b), PAD.t, Math.abs(sel.b - sel.a), ph);
+  }
+  
+}
+
+function plotLine(g, data, i0, i1, X, Y, pw) {
+  const count = i1 - i0 + 1;
+  g.beginPath();
+  if (count <= pw * 2) {
+    for (let i = i0; i <= i1; i++) { const x = X(i), y = Y(data[i]); i === i0 ? g.moveTo(x, y) : g.lineTo(x, y); }
+  } else { /* mínimo e máximo por coluna de pixel */
+    const per = count / pw;
+    for (let p = 0; p < pw; p++) {
+      const a = i0 + Math.floor(p * per), b = Math.min(i1, i0 + Math.floor((p + 1) * per));
+      let mn = Infinity, mx = -Infinity;
+      for (let i = a; i <= b; i++) { const v = data[i]; if (v < mn) mn = v; if (v > mx) mx = v; }
+      const x = PAD.l + p;
+      if (p === 0) g.moveTo(x, Y(mx)); else g.lineTo(x, Y(mx));
+      g.lineTo(x, Y(mn));
+    }
+  }
+  g.stroke();
+}
+
+function renderLegend(series) {
+  const el = $('legend');
+  const items = series.map(s => ({ id: s.id, name: s.name, color: s.color, dash: s.dash, off: S.hide.has(s.id) || (s.defOff && !S.hide.has('!' + s.id)), defOff: s.defOff }));
+  if (S.adOn) items.push({ id: 'fast', name: 'Modo rápido ativo', color: css('--fast'), band: true, off: S.hide.has('fast') });
+  el.innerHTML = items.map(it => `<span class="it${it.off ? ' off' : ''}" data-id="${it.id}" data-def="${it.defOff ? 1 : 0}">
+    <span class="sw${it.band ? ' band' : ''}" style="background:${it.dash ? 'repeating-linear-gradient(90deg,' + it.color + ' 0 5px,transparent 5px 9px)' : it.color}"></span>${it.name}</span>`).join('');
+  el.querySelectorAll('.it').forEach(x => x.addEventListener('click', () => {
+    const id = x.dataset.id;
+    if (x.dataset.def === '1') { S.hide.has('!' + id) ? S.hide.delete('!' + id) : S.hide.add('!' + id); }
+    else S.hide.has(id) ? S.hide.delete(id) : S.hide.add(id);
+    draw();
+  }));
+}
+
+/* zoom e dica */
+let sel = null;
+function bindChart() {
+  const cv = $('chart'), tip = $('tip');
+  const idxAt = x => { const { i0, i1, pw } = geom; return Math.round(i0 + (x - PAD.l) / pw * (i1 - i0)); };
+  cv.addEventListener('mousedown', e => { if (!geom) return; const x = e.offsetX; if (x < PAD.l || x > PAD.l + geom.pw) return; sel = { a: x, b: x }; });
+  window.addEventListener('mouseup', () => {
+    if (!sel) return;
+    const a = Math.min(sel.a, sel.b), b = Math.max(sel.a, sel.b);
+    if (b - a > 8) { const i0 = idxAt(a), i1 = idxAt(b); if (i1 - i0 > 10) S.view = [Math.max(0, i0), Math.min(S.res.r.n - 1, i1)]; }
+    sel = null; draw(); renderScore();
+  });
+  cv.addEventListener('mousemove', e => {
+    if (!geom) return;
+    const x = e.offsetX;
+    if (sel) { sel.b = Math.max(PAD.l, Math.min(PAD.l + geom.pw, x)); draw(); return; }
+    showTip(x, e.offsetY);
+  });
+  cv.addEventListener('mouseleave', () => { tip.hidden = true; });
+  cv.addEventListener('dblclick', () => { S.view = null; draw(); renderScore(); });
+  cv.addEventListener('touchstart', e => { const t = e.touches[0], rc = cv.getBoundingClientRect(); showTip(t.clientX - rc.left, t.clientY - rc.top); }, { passive: true });
+
+  function showTip(x, y) {
+    if (x < PAD.l || x > PAD.l + geom.pw) { tip.hidden = true; return; }
+    const i = Math.max(geom.i0, Math.min(geom.i1, idxAt(x)));
+    const { sig, r } = S.res;
+    const rows = [`<div>${tLabel(i * DT, 1)}</div>`];
+    if (sig.truth) rows.push(`Peso real: <b>${fmtKg(sig.truth[i])}</b>`);
+    rows.push(`Atual: <b style="color:${css('--cur')}">${fmtKg(r.wA[i])}</b>${r.sA[i] ? ' · estável' : ''}`);
+    if (S.adOn) rows.push(`Adaptativo: <b style="color:${css('--ada')}">${fmtKg(r.wB[i])}</b>${r.sB[i] ? ' · estável' : ''}${r.fast[i] ? ' · modo rápido' : ''}`);
+    tip.innerHTML = rows.join('<br>');
+    tip.hidden = false;
+    const wrapW = cv.clientWidth;
+    tip.style.left = Math.min(x + 14, wrapW - tip.offsetWidth - 4) + 'px';
+    tip.style.top = Math.max(4, y - tip.offsetHeight - 10) + 'px';
+  }
+}
+
+
+
+/* ----------------------------------------------------------------- placar */
+function renderScore() {
+  if (!S.res) return;
+  const { sig, r, m } = S.res;
+  const el = $('score'), note = $('scoreNote');
+  const [i0, i1] = S.view || [0, r.n - 1];
+  const ppRange = w => { let mn = Infinity, mx = -Infinity; for (let i = i0; i <= i1; i++) { mn = Math.min(mn, w[i]); mx = Math.max(mx, w[i]); } return mx - mn; };
+  const fastPct = () => { let c = 0; for (let i = i0; i <= i1; i++) c += r.fast[i] > 0; return 100 * c / (i1 - i0 + 1); };
+  const ad = S.adOn;
+
+  if (!m) { /* CSV: sem peso real */
+    el.innerHTML = `<div class="kpis">
+      <div class="kpi"><div class="k">Oscilação · atual</div><div class="v">${fmt(ppRange(r.wA), 0)} <small>kg pico a pico</small></div></div>
+      ${ad ? `<div class="kpi"><div class="k">Oscilação · adaptativo</div><div class="v">${fmt(ppRange(r.wB), 0)} <small>kg pico a pico</small></div></div>
+      <div class="kpi"><div class="k">Tempo em modo rápido</div><div class="v">${fmt(fastPct(), 0)} <small>%</small></div></div>` : ''}
+      <div class="kpi"><div class="k">Trecho</div><div class="v">${fmt((i1 - i0) * DT, 0)} <small>s</small></div></div></div>`;
+    note.textContent = 'Registro de campo não tem o peso real: compare as curvas e use o zoom para medir a oscilação em trechos de mistura.';
+    return;
+  }
+
+  const evs = m.events.filter(x => !(S.view && (x.e.t0 / DT > i1 || (x.e.t0 + x.e.dur) / DT < i0)));
+  const avg = k => { const v = evs.map(x => x[k].t).filter(t => t != null); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
+  const worstOver = k => evs.reduce((a, x) => Math.max(a, x[k].over), 0);
+  const tCell = x => x.t == null ? `> ${fmt(x.tMax, 0)} s` : fmt(x.t, 1) + ' s' + (x.ramp ? ` <small>(${fmt(x.lagKg, 0)} kg atrás, ±${fmt(x.osc, 0)})</small>` : '');
+  const gain = (a, b) => {
+    if (a.t == null && b.t != null) return '<span class="gain">chega</span>';
+    if (a.t == null || b.t == null) return '—';
+    const d = a.t - b.t;
+    if (Math.abs(d) < 0.15) return '≈';
+    return d > 0 ? `<span class="gain">−${fmt(d, 1)} s</span>` : `<span class="loss">+${fmt(-d, 1)} s</span>`;
+  };
+  const aA = avg('A'), aB = avg('B');
+
+  let html = `<div class="kpis">
+    <div class="kpi"><div class="k">Peso aparece em</div><div class="v"><span class="cur">${fmt(aA, 1)}</span>${ad ? ` → <span class="ada">${fmt(aB, 1)}</span>` : ''} <small>s (média)</small></div></div>
+    <div class="kpi"><div class="k">Oscilação sem carga</div><div class="v"><span class="cur">${fmt(m.quiet.A, 0)}</span>${ad ? ` → <span class="ada">${fmt(m.quiet.B, 0)}</span>` : ''} <small>kg p-p</small></div></div>
+    <div class="kpi"><div class="k">Pior sobressinal</div><div class="v"><span class="cur">${fmt(worstOver('A'), 0)}</span>${ad ? ` → <span class="ada">${fmt(worstOver('B'), 0)}</span>` : ''} <small>kg</small></div></div>
+    <div class="kpi"><div class="k">Modo rápido indevido</div><div class="v">${ad ? `<span class="ada">${m.false.B}</span>` : '—'} <small>vezes sem carga</small></div></div>
+  </div>`;
+  if (evs.length) {
+    html += `<table><thead><tr><th>Carga</th><th>Peso real</th><th>Atual</th>${ad ? '<th>Adaptativo</th><th>Ganho</th>' : ''}<th>Sobressinal atual</th>${ad ? '<th>Sobressinal adapt.</th>' : ''}</tr></thead><tbody>`;
+    for (const x of evs) {
+      const e = x.e;
+      html += `<tr><td>${x.idx + 1}. ${EV_TYPES[e.type]} ${e.kg > 0 ? '+' : ''}${fmt(e.kg, 0)} kg em ${fmt(e.dur, e.dur < 1 ? 2 : 1)} s · ${tLabel(e.t0, 1)}</td>
+        <td>${fmtKg(S.res.sig.truth[Math.min(r.n - 1, Math.round((e.t0 + e.dur) / DT))])}</td>
+        <td class="cur">${tCell(x.A)}</td>${ad ? `<td class="ada">${tCell(x.B)}</td><td>${gain(x.A, x.B)}</td>` : ''}
+        <td>${fmt(x.A.over, 0)} kg</td>${ad ? `<td>${fmt(x.B.over, 0)} kg</td>` : ''}</tr>`;
+    }
+    html += '</tbody></table>';
+  }
+  el.innerHTML = html;
+  note.textContent = '“Peso aparece em”: tempo, depois que a carga termina de entrar, até a leitura (média de 1 s) atingir 95 % da carga e não sair mais dessa faixa (ou da oscilação normal da leitura parada, se for maior). Em rampa e descarga: atraso médio da leitura enquanto o material entra ou sai, e a oscilação (±) da leitura em torno do peso real nesse trecho. Oscilação sem carga: pico a pico da leitura nos trechos parados ou misturando, a partir de 8 s após cada carga.' + (S.view ? ' Placar restrito ao trecho ampliado.' : '');
+}
+
+/* ---------------------------------------------------------------- roteiro */
+const STEPS = {
+  1: { scen: 0, show: { B: false }, title: 'O problema', body: () => `<p>No vagão misturador a balança tem dois trabalhos que disputam o mesmo ajuste de filtro:</p>
+      <p><b>Durante a mistura</b>, o misturador faz o sinal oscilar (linha cinza clara) sem que entre carga — o filtro precisa ser forte para a leitura ficar parada.
+      <b>Na entrada dos ingredientes</b>, o operador precisa ver o peso subir rápido para não passar da quantidade.</p>
+      <p>Com um ajuste fixo, um filtro forte deixa a leitura lenta e um filtro rápido deixa a leitura oscilando.</p>` },
+  2: { scen: 0, show: { B: false }, title: 'O filtro atual (preset Carregamento)', body: m => {
+      const ev = m && m.events.find(x => x.e.kg >= 800);
+      return `<p>Linha azul: o peso exibido hoje. Na mistura ela fica parada — o filtro cumpre bem esse papel.</p>
+      <p>Mas na entrada de carga ela fica para trás do peso real (tracejado)${ev && ev.A.t != null ? `: na carga de ${fmt(ev.e.kg, 0)} kg, o valor só aparece <b>${fmt(ev.A.t, 1)} s</b> depois que o material terminou de entrar` : ''}.</p>
+      <p>Esse atraso vem da média móvel e da limitação de velocidade, que são fixas no preset.</p>`; } },
+  3: { scen: 0, show: { B: true }, title: 'A filtragem adaptativa', body: m => {
+      const ev = m && m.events.find(x => x.e.kg >= 800);
+      return `<p>Linha laranja: o mesmo preset com a camada adaptativa. Ela reconhece a <b>entrada persistente de carga</b> — tendência na mesma direção, com amplitude acima do nível de vibração e por tempo suficiente — e acelera a leitura (faixa laranja: modo rápido).</p>
+      <p>Quando a carga para, volta <b>gradualmente</b> à filtragem forte. Oscilação sem tendência não aciona o modo rápido.</p>
+      ${ev && ev.B.t != null ? `<p>Na carga de ${fmt(ev.e.kg, 0)} kg: <b>${fmt(ev.A.t, 1)} s → ${fmt(ev.B.t, 1)} s</b>.</p>` : ''}`; } },
+  4: { scen: 0, show: { B: true }, title: 'Resultados', body: m => m ? `<p>No placar abaixo, cada carga do trato com o tempo até o peso aparecer nos dois filtros, e a oscilação nos trechos sem carga.</p>
+      <p>O objetivo é reduzir o atraso <b>sem piorar</b> a leitura parada: compare “Oscilação sem carga” e “Modo rápido indevido”.</p>
+      <p>Experimente outros cenários (vibração forte, ingredientes pequenos, descarga) ou carregue um registro de campo.</p>` : '' },
+};
+
+function setTour(step) {
+  S.step = step;
+  document.querySelectorAll('#tour button').forEach(b => b.classList.toggle('on', +b.dataset.step === step));
+  $('guide').hidden = !step;
+  if (step) {
+    const st = STEPS[step];
+    if (S.csv) S.csv = null;
+    if (S.scen !== st.scen || step === 1) { loadScenario(st.scen); setPreset(3); }
+    S.adOn = st.show.B; $('adOn').checked = S.adOn;
+    S.view = null;
+    compute();
+    if (step === 4) $('scoreCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } else schedule();
+}
+
+function renderGuide() {
+  const st = STEPS[S.step];
+  if (!st) return;
+  $('guideText').innerHTML = `<h3>${S.step}. ${st.title}</h3>${st.body(S.res && S.res.m)}`;
+  $('gPrev').disabled = S.step <= 1;
+  $('gNext').textContent = S.step >= 4 ? 'Explorar livremente ▶' : 'Próximo ▶';
+}
+
+/* ------------------------------------------------------------------ início */
+(async function main() {
+  try { await loadMotor(); }
+  catch (e) { document.body.innerHTML = '<p style="padding:20px">Não foi possível iniciar o simulador neste navegador.</p>'; return; }
+  S.p = { ...PRESETS[3], ...DISPLAY_DEFAULT };
+  bind();
+  bindChart();
+  loadScenario(0);
+  setPreset(3);
+  const m = /passo=(\d)/.exec(location.hash), c = /cenario=(\d+)/.exec(location.hash);
+  if (c && SCENARIOS[+c[1]]) { loadScenario(+c[1]); setTour(0); }
+  else setTour(m ? Math.min(4, +m[1]) : 1);
+})();
+
+</script>
+</body>
+</html>
