@@ -263,6 +263,10 @@ table.at td.params { font-size: 12px; color: var(--muted); }
         <label>Vazão irregular (%)<input type="number" id="flowIrr" step="10" min="0" max="90"></label>
       </div>
       <div class="row2">
+        <label>Andando de (s)<input type="number" id="moveT0" step="5" min="0"></label>
+        <label>até (s)<input type="number" id="moveT1" step="5" min="0"></label>
+      </div>
+      <div class="row2">
         <label>Deriva (kg/min)<input type="number" id="drift" step="1"></label>
         <label>Semente<input type="number" id="seed" step="1"></label>
       </div>
@@ -407,15 +411,17 @@ const DISPLAY_DEFAULT = { dec: 0, div: 1, sw: 5, st: 10 };
 /* ------------------------------------------------------------- cenários */
 const VIB = (a, f, h = 30, t0 = 0, t1 = 1e9) => ({ vibOn: true, vibA: a, vibF: f, vibH: h, vibT0: t0, vibT1: t1 });
 /* perturbações do vagão em movimento: desligadas salvo indicação */
-const D_DEFAULT = { swayA: 0, swayT: 3.5, bumpR: 0, bumpA: 200, flowIrr: 0, engA: 0, engF: 22, engW: 8 };
+const D_DEFAULT = { swayA: 0, swayT: 3.5, bumpR: 0, bumpA: 200, flowIrr: 0, engA: 0, engF: 22, engW: 8, moveT0: 0, moveT1: 1e9 };
 /* vibração de motor/TDP (alta frequência): passa pelo filtro do conversor e
  * pela leitura a 20 Hz, como na balança */
 const HF = (a, f, w = 8) => ({ engA: a, engF: f, engW: w });
 const SCENARIOS = [
   {
-    name: 'Trato completo (misturador ligado)', w0: 800, dur: 240,
-    ev: [['pa', 20, 900, 2], ['pa', 45, 1100, 2], ['rampa', 75, 1500, 25], ['pa', 125, 150, 1], ['pa', 150, 60, 1], ['rampa', 175, 600, 12]],
-    d: { ...VIB(60, 1.1), ...HF(150, 21), noise: 15, impR: 3, impA: 200, drift: 0, seed: 11 },
+    name: 'Trato completo: carregamento, mistura e distribuição', w0: 800, dur: 345, flow: 60,
+    ev: [['pa', 20, 900, 2], ['pa', 45, 1100, 2], ['rampa', 75, 1500, 25], ['pa', 125, 150, 1], ['pa', 150, 60, 1], ['rampa', 175, 600, 12],
+         ['descarga', 225, -1300, 22], ['descarga', 262, -1200, 20], ['descarga', 300, -1300, 22]],
+    d: { ...VIB(60, 1.1), ...HF(150, 21), noise: 15, impR: 3, impA: 200, drift: 0, seed: 11,
+         swayA: 80, swayT: 3.5, bumpR: 5, bumpA: 300, flowIrr: 40, moveT0: 210, moveT1: 345 },
   },
   {
     name: 'Pá carregadeira', w0: 2000, dur: 100,
@@ -561,7 +567,7 @@ function generate(seedOverride) {
   const bumps = [];
   if (d.bumpR > 0 && d.bumpA > 0) {
     const p = d.bumpR / 60 * DT;
-    for (let i = 0; i < n; i++) if (rnd() < p) bumps.push([i * DT, d.bumpA * (0.4 + 0.6 * rnd()) * (rnd() < 0.5 ? -1 : 1), 1.6 + 0.8 * rnd()]);
+    for (let i = 0; i < n; i++) if (rnd() < p && i * DT >= d.moveT0 && i * DT <= d.moveT1) bumps.push([i * DT, d.bumpA * (0.4 + 0.6 * rnd()) * (rnd() < 0.5 ? -1 : 1), 1.6 + 0.8 * rnd()]);
   }
   const phS1 = rnd() * 6.283, phS2 = rnd() * 6.283;
 
@@ -597,8 +603,8 @@ function generate(seedOverride) {
       const a = d.vibA * (1 + 0.15 * Math.sin(2 * Math.PI * 0.05 * t));
       x += env * (a * Math.sin(2 * Math.PI * d.vibF * t + ph1) + (d.vibH / 100) * a * Math.sin(4 * Math.PI * d.vibF * t + ph2));
     }
-    if (d.swayA > 0 && d.swayT > 0) /* balanço do vagão no terreno */
-      x += d.swayA * (0.7 * Math.sin(2 * Math.PI * t / d.swayT + phS1) + 0.3 * Math.sin(2 * Math.PI * t / (d.swayT * 1.618) + phS2));
+    if (d.swayA > 0 && d.swayT > 0 && t >= d.moveT0 && t <= d.moveT1) /* balanço do vagão no terreno */
+      x += Math.min(1, (t - d.moveT0) / 2, (d.moveT1 - t) / 2) * d.swayA * (0.7 * Math.sin(2 * Math.PI * t / d.swayT + phS1) + 0.3 * Math.sin(2 * Math.PI * t / (d.swayT * 1.618) + phS2));
     for (const [tb, a, f] of bumps) { const tau = t - tb; if (tau >= 0 && tau < 2.5) x += a * Math.exp(-tau / 0.45) * Math.sin(2 * Math.PI * f * tau); }
     if (d.noise > 0) x += (d.noise / 2) * gauss();
     for (const [ti, a] of imp) { const u = (t - ti) / 0.15; if (u >= 0 && u <= 1) x += a * Math.sin(Math.PI * u); }
@@ -992,7 +998,7 @@ function setPreset(i) {
 
 const P_FIELDS = { p_core: 'core', p_fc: 'fc', p_ma: 'ma', p_sl_iir: 'slI', p_v0_iir: 'v0I', p_a_iir: 'aI', p_vm_iir: 'vmI', p_sl_ma: 'slM', p_v0_ma: 'v0M', p_a_ma: 'aM', p_vm_ma: 'vmM', p_dec: 'dec', p_div: 'div', p_sw: 'sw', p_st: 'st' };
 const P_CHECKS = { p_med: 'med', p_acc_iir: 'accI', p_acc_ma: 'accM' };
-const D_FIELDS = ['vibA', 'vibF', 'vibH', 'vibT0', 'vibT1', 'noise', 'impR', 'impA', 'drift', 'seed', 'swayA', 'swayT', 'bumpR', 'bumpA', 'flowIrr', 'engA', 'engF', 'engW'];
+const D_FIELDS = ['vibA', 'vibF', 'vibH', 'vibT0', 'vibT1', 'noise', 'impR', 'impA', 'drift', 'seed', 'swayA', 'swayT', 'bumpR', 'bumpA', 'flowIrr', 'engA', 'engF', 'engW', 'moveT0', 'moveT1'];
 
 function syncInputs() {
   $('scenario').value = S.scen;
@@ -1369,8 +1375,9 @@ function renderScore() {
 /* ---------------------------------------------------------------- roteiro */
 const STEPS = {
   1: { scen: 0, show: { B: false }, title: 'O problema', body: () => `<p>No vagão misturador a balança tem dois trabalhos que disputam o mesmo ajuste de filtro:</p>
-      <p><b>Durante a mistura</b>, o misturador faz o sinal oscilar (linha cinza clara) sem que entre carga — o filtro precisa ser forte para a leitura ficar parada.
-      <b>Na entrada dos ingredientes</b>, o operador precisa ver o peso subir rápido para não passar da quantidade.</p>
+      <p>Um trato completo tem três fases: <b>carregamento</b> dos ingredientes (o peso sobe), <b>mistura</b> e <b>distribuição</b> nos cochos (o peso desce, com o vagão andando).</p>
+      <p><b>Durante a mistura</b>, o misturador e o motor fazem o sinal oscilar (linha cinza clara) sem que entre carga — o filtro precisa ser forte para a leitura ficar parada.
+      <b>Na entrada dos ingredientes e na descarga</b>, o operador precisa ver o peso mudar rápido para não passar da quantidade.</p>
       <p>Com um ajuste fixo, um filtro forte deixa a leitura lenta e um filtro rápido deixa a leitura oscilando.</p>` },
   2: { scen: 0, show: { B: false }, title: 'O filtro atual (preset Carregamento)', body: m => {
       const ev = m && m.events.find(x => x.e.kg >= 800);
