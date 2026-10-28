@@ -245,6 +245,13 @@ table.at td.params { font-size: 12px; color: var(--muted); }
         <label>Impactos/min<input type="number" id="impR" step="1" min="0"></label>
         <label>Impacto (kg)<input type="number" id="impA" step="10" min="0"></label>
       </div>
+      <h3>Alta frequência (motor / TDP)</h3>
+      <div class="row3">
+        <label>Vibração (± kg)<input type="number" id="engA" step="10" min="0"></label>
+        <label>Frequência (Hz)<input type="number" id="engF" step="1" min="2" max="100"></label>
+        <label>Variação de rotação (%)<input type="number" id="engW" step="1" min="0" max="30"></label>
+      </div>
+      <p class="note">Vibração rápida do motor/TDP. A balança lê 20 vezes por segundo: vibrações perto de 20 Hz (ou de 40 Hz) reaparecem na leitura como oscilações lentas, difíceis de filtrar.</p>
       <h3>Vagão em movimento</h3>
       <div class="row2">
         <label>Balanço (± kg)<input type="number" id="swayA" step="10" min="0"></label>
@@ -398,37 +405,40 @@ const DISPLAY_DEFAULT = { dec: 0, div: 1, sw: 5, st: 10 };
 /* ------------------------------------------------------------- cenários */
 const VIB = (a, f, h = 30, t0 = 0, t1 = 1e9) => ({ vibOn: true, vibA: a, vibF: f, vibH: h, vibT0: t0, vibT1: t1 });
 /* perturbações do vagão em movimento: desligadas salvo indicação */
-const D_DEFAULT = { swayA: 0, swayT: 3.5, bumpR: 0, bumpA: 200, flowIrr: 0 };
+const D_DEFAULT = { swayA: 0, swayT: 3.5, bumpR: 0, bumpA: 200, flowIrr: 0, engA: 0, engF: 22, engW: 8 };
+/* vibração de motor/TDP (alta frequência): passa pelo filtro do conversor e
+ * pela leitura a 20 Hz, como na balança */
+const HF = (a, f, w = 8) => ({ engA: a, engF: f, engW: w });
 const SCENARIOS = [
   {
     name: 'Trato completo (misturador ligado)', w0: 800, dur: 240,
     ev: [['pa', 20, 900, 2], ['pa', 45, 1100, 2], ['rampa', 75, 1500, 25], ['pa', 125, 150, 1], ['pa', 150, 60, 1], ['rampa', 175, 600, 12]],
-    d: { ...VIB(35, 1.1), noise: 6, impR: 2, impA: 120, drift: 0, seed: 11 },
+    d: { ...VIB(60, 1.1), ...HF(150, 21), noise: 15, impR: 3, impA: 200, drift: 0, seed: 11 },
   },
   {
     name: 'Pá carregadeira', w0: 2000, dur: 100,
     ev: [['pa', 20, 800, 1.5], ['pa', 45, 1200, 2], ['pa', 70, 600, 1]],
-    d: { ...VIB(30, 1.0), noise: 5, impR: 0, impA: 100, drift: 0, seed: 3 },
+    d: { ...VIB(50, 1.0), ...HF(120, 18), noise: 12, impR: 2, impA: 150, drift: 0, seed: 3 },
   },
   {
     name: 'Esteira / rosca', w0: 1000, dur: 120,
     ev: [['rampa', 20, 1500, 30], ['rampa', 80, 400, 15]],
-    d: { ...VIB(30, 1.2), noise: 5, impR: 0, impA: 100, drift: 0, seed: 5 },
+    d: { ...VIB(50, 1.2), ...HF(120, 23), noise: 12, impR: 2, impA: 150, drift: 0, seed: 5 },
   },
   {
     name: 'Ingredientes pequenos', w0: 3000, dur: 110,
     ev: [['pa', 20, 100, 1], ['pa', 45, 50, 1], ['pa', 70, 200, 1.5]],
-    d: { ...VIB(25, 1.1), noise: 4, impR: 0, impA: 100, drift: 0, seed: 8 },
+    d: { ...VIB(45, 1.1), ...HF(100, 20), noise: 10, impR: 2, impA: 150, drift: 0, seed: 8 },
   },
   {
     name: 'Mistura sem carga (vibração forte)', w0: 6000, dur: 120,
     ev: [],
-    d: { ...VIB(60, 0.8, 40), noise: 8, impR: 4, impA: 150, drift: 0, seed: 21 },
+    d: { ...VIB(90, 0.8, 40), ...HF(200, 21, 10), noise: 18, impR: 5, impA: 250, drift: 0, seed: 21 },
   },
   {
     name: 'Trato: distribuição com o vagão andando', w0: 6500, dur: 200,
     ev: [['descarga', 15, -1800, 30], ['descarga', 70, -2200, 35], ['descarga', 130, -1500, 25]], flow: 55,
-    d: { ...VIB(40, 1.1), noise: 8, impR: 2, impA: 120, drift: 0, seed: 13, swayA: 70, swayT: 3.5, bumpR: 5, bumpA: 250, flowIrr: 50 },
+    d: { ...VIB(60, 1.1), ...HF(150, 24, 12), noise: 15, impR: 3, impA: 200, drift: 0, seed: 13, swayA: 100, swayT: 3.5, bumpR: 6, bumpA: 350, flowIrr: 50 },
   },
   {
     name: 'Degrau limpo (laboratório)', w0: 0, dur: 60,
@@ -586,6 +596,32 @@ function generate(seedOverride) {
     x += d.drift / 60 * t;
     input[i] = w + x;
   }
+  /* vibração de motor/TDP: gerada a 500 Hz, filtrada como no conversor
+   * (sinc4 a 50 conversões/s) e lida a 20 Hz pela última conversão — sem
+   * filtro anti-aliasing, como no equipamento. Frequências perto de 20 Hz
+   * reaparecem como oscilações lentas. */
+  if (d.engA > 0 && d.engF > 0) {
+    const FS = 500, R = FS / 50, nP = Math.ceil(n * DT * FS) + 4 * R + 1;
+    const p1 = rnd() * 6.283, p2 = rnd() * 6.283, p3 = rnd() * 6.283, wob = (d.engW || 0) / 100;
+    let y = new Float64Array(nP), ph = rnd() * 6.283;
+    for (let k = 0; k < nP; k++) {
+      const t = k / FS;
+      const f = d.engF * (1 + wob * (0.6 * Math.sin(2 * Math.PI * t / 7.3 + p1) + 0.4 * Math.sin(2 * Math.PI * t / 2.9 + p2)));
+      ph += 2 * Math.PI * f / FS;
+      y[k] = d.engA * (Math.sin(ph) + 0.35 * Math.sin(2 * ph + p3));
+    }
+    for (let stage = 0; stage < 4; stage++) { /* sinc4 = 4 médias de 1 conversão */
+      const z = new Float64Array(nP);
+      let acc = 0;
+      for (let k = 0; k < nP; k++) { acc += y[k]; if (k >= R) acc -= y[k - R]; z[k] = acc / R; }
+      y = z;
+    }
+    for (let i = 0; i < n; i++) {
+      const conv = Math.floor(i * DT * 50 + 1e-9); /* última conversão pronta */
+      input[i] += y[Math.min(nP - 1, conv * R + 4 * R)];
+    }
+  }
+
   /* sinal da comporta: aberta durante cada descarga */
   const gate = new Float32Array(n);
   for (const e of evs) if (e.type === 'descarga') {
@@ -925,7 +961,7 @@ function setPreset(i) {
 
 const P_FIELDS = { p_core: 'core', p_fc: 'fc', p_ma: 'ma', p_sl_iir: 'slI', p_v0_iir: 'v0I', p_a_iir: 'aI', p_vm_iir: 'vmI', p_sl_ma: 'slM', p_v0_ma: 'v0M', p_a_ma: 'aM', p_vm_ma: 'vmM', p_dec: 'dec', p_div: 'div', p_sw: 'sw', p_st: 'st' };
 const P_CHECKS = { p_med: 'med', p_acc_iir: 'accI', p_acc_ma: 'accM' };
-const D_FIELDS = ['vibA', 'vibF', 'vibH', 'vibT0', 'vibT1', 'noise', 'impR', 'impA', 'drift', 'seed', 'swayA', 'swayT', 'bumpR', 'bumpA', 'flowIrr'];
+const D_FIELDS = ['vibA', 'vibF', 'vibH', 'vibT0', 'vibT1', 'noise', 'impR', 'impA', 'drift', 'seed', 'swayA', 'swayT', 'bumpR', 'bumpA', 'flowIrr', 'engA', 'engF', 'engW'];
 
 function syncInputs() {
   $('scenario').value = S.scen;
